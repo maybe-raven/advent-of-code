@@ -295,7 +295,7 @@ fn snafu_to_i64(input: &str) -> Option<i64> {
         })
 }
 
-const INPUT_FILENAME: &'static str = "input/full_of_hot_air.txt";
+const INPUT_FILENAME: &str = "input/full_of_hot_air.txt";
 
 pub fn main() -> Result<(), String> {
     let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
