@@ -51,6 +51,20 @@ impl HazzardMovement {
     }
 }
 
+impl TryFrom<char> for HazzardMovement {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '>' => Ok(Self::Right),
+            '^' => Ok(Self::Up),
+            '<' => Ok(Self::Left),
+            'v' => Ok(Self::Down),
+            _ => Err(()),
+        }
+    }
+}
+
 // struct Hazzard {
 //     movement: Movement,
 //     coordinate: Coordinate,
@@ -156,7 +170,6 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
 struct Board<const WIDTH: usize, const HEIGHT: usize> {
     count: usize,
     hazzards: Vec<(HazzardMovement, Coordinate<WIDTH, HEIGHT>)>,
-    player_location: Coordinate<WIDTH, HEIGHT>,
 }
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
@@ -247,9 +260,29 @@ impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        // TODO: Should check input grid size.
+        let hazzards = s
+            .lines()
+            .enumerate()
+            .flat_map(|(y, line)| {
+                line.chars().enumerate().filter_map(move |(x, ch)| {
+                    HazzardMovement::try_from(ch)
+                        .map(move |m| (m, Coordinate::new_unchecked(x, y)))
+                        .ok()
+                })
+            })
+            .collect();
+        Ok(Self { count: 0, hazzards })
     }
 }
+
+// impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
+//     type Err = ();
+//
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         todo!()
+//     }
+// }
 
 // impl<const WIDTH: usize, const HEIGHT: usize> Index<Coordinate<WIDTH, HEIGHT>>
 //     for Board<WIDTH, HEIGHT>
@@ -261,25 +294,11 @@ impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
 //     }
 // }
 
-// pub fn main() -> Result<(), String> {
-//     const INPUT_FILENAME: &str = "input/blizzard_basin.txt";
-//     let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
-//     let (result, result_i64) = input
-//         .lines()
-//         .try_fold((SnafuNumber::default(), 0i64), |(acc, acc_i64), line| {
-//             let num: SnafuNumber = line.parse().ok()?;
-//             let num_i64 = snafu_to_i64(line)?;
-//             print!("{} | {} | {}; ", line, &num, num_i64);
-//             let sum = num + acc;
-//             let parsed_sum_i64 = snafu_to_i64(String::from(&sum).as_str())?;
-//             let sum_i64 = num_i64 + acc_i64;
-//             println!("sum: {} | {} | {}", sum, parsed_sum_i64, sum_i64);
-//             assert_eq!(parsed_sum_i64, sum_i64);
-//             Some((sum, sum_i64))
-//         })
-//         .ok_or("Invalid SNAFU number.")?;
-//
-//     println!("{}, {}", result, result_i64);
-//
-//     Ok(())
-// }
+pub fn main() -> Result<(), String> {
+    const INPUT_FILENAME: &str = "input/blizzard_basin.txt";
+    let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
+    let mut board: Board<100, 35> = input.parse().expect("We choose the correct input here.");
+    println!("{}", board.solve());
+
+    Ok(())
+}
