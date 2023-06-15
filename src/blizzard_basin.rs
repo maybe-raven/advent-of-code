@@ -97,6 +97,10 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
         y: HEIGHT - 1,
     };
 
+    fn is_zero(&self) -> bool {
+        self.x == 0 && self.y == 0
+    }
+
     fn new(x: usize, y: usize) -> Self {
         Self {
             x: min(x, WIDTH - 1),
@@ -106,6 +110,43 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
 
     fn new_unchecked(x: usize, y: usize) -> Self {
         Self { x, y }
+    }
+
+    fn get_neighbors(&self) -> [Option<Self>; 4] {
+        [
+            if self.x == 0 {
+                None
+            } else {
+                Some(Self {
+                    x: self.x - 1,
+                    y: self.y,
+                })
+            },
+            if self.y == 0 {
+                None
+            } else {
+                Some(Self {
+                    x: self.x,
+                    y: self.y - 1,
+                })
+            },
+            if self.x == WIDTH - 1 {
+                None
+            } else {
+                Some(Self {
+                    x: self.x + 1,
+                    y: self.y,
+                })
+            },
+            if self.y == HEIGHT - 1 {
+                None
+            } else {
+                Some(Self {
+                    x: self.x,
+                    y: self.y + 1,
+                })
+            },
+        ]
     }
 
     fn move_player(self, m: PlayerMovement) -> Option<Self> {
@@ -202,36 +243,36 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
             .any(|(_, hazzard_coord)| hazzard_coord.eq(coord))
     }
 
+    fn better_tick(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
+        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
+            *coord = coord.move_hazzard(movement);
+            next_moves.remove(coord);
+        }
+        self.count += 1;
+    }
+
     pub fn solve(&mut self) -> usize {
         let entrance = Coordinate::new_unchecked(0, 0);
 
-        let mut current: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
-        let mut next: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
+        let mut next_moves: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
 
         loop {
-            self.tick();
-
-            if self.tile_is_safe(&entrance) {
-                next.insert(entrance);
-            }
-
-            for player_location in current.drain() {
-                if let Some(moves) = self.find_moves(player_location) {
-                    for new_location in moves
-                        .into_iter()
-                        .filter_map(identity)
-                        .filter_map(|m| player_location.move_player(m))
-                    {
-                        if new_location == Coordinate::MAX {
-                            return self.count + 1;
-                        }
-
-                        next.insert(new_location);
-                    }
+            for player_location in next_moves.clone() {
+                if player_location == Coordinate::MAX {
+                    return self.count + 1;
                 }
+
+                next_moves.extend(
+                    player_location
+                        .get_neighbors()
+                        .into_iter()
+                        .flat_map(identity),
+                );
             }
 
-            (current, next) = (next, current);
+            next_moves.insert(entrance);
+
+            self.better_tick(&mut next_moves);
         }
     }
 
@@ -399,6 +440,6 @@ mod tests {
         let mut board: Board<2, 2> = TEST_INPUT_2.parse().unwrap();
 
         let result = board.solve();
-        assert_eq!(4, result, "The expected solution is 4. Got {}", result);
+        assert_eq!(4, result, "Hazzards in the board: {:?}", board.hazzards);
     }
 }
