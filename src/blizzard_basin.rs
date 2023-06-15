@@ -174,8 +174,8 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
     }
 }
 
-#[derive(Debug)]
-struct Board<const WIDTH: usize, const HEIGHT: usize> {
+#[derive(Debug, Clone)]
+pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
     count: usize,
     hazzards: Vec<(HazzardMovement, Coordinate<WIDTH, HEIGHT>)>,
 }
@@ -202,7 +202,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
             .any(|(_, hazzard_coord)| hazzard_coord.eq(coord))
     }
 
-    fn solve(&mut self) -> usize {
+    pub fn solve(&mut self) -> usize {
         let entrance = Coordinate::new_unchecked(0, 0);
 
         let mut current: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
