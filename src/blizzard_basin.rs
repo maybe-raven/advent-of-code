@@ -2,7 +2,14 @@
 //! https://adventofcode.com/2022/day/24
 
 #![allow(unused, dead_code)]
-use std::{cmp::min, collections::VecDeque, convert::identity, fs, ops::Index, str::FromStr};
+use std::{
+    cmp::min,
+    collections::{HashSet, VecDeque},
+    convert::identity,
+    fs,
+    ops::Index,
+    str::FromStr,
+};
 
 trait CheckedDec {
     fn checked_dec(self) -> Self;
@@ -32,7 +39,7 @@ impl PlayerMovement {
         [Self::Up, Self::Down, Self::Left, Self::Right, Self::Wait];
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HazzardMovement {
     Up,
     Down,
@@ -78,7 +85,7 @@ struct Coord {
     y: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
     x: usize,
     y: usize,
@@ -167,6 +174,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
     }
 }
 
+#[derive(Debug)]
 struct Board<const WIDTH: usize, const HEIGHT: usize> {
     count: usize,
     hazzards: Vec<(HazzardMovement, Coordinate<WIDTH, HEIGHT>)>,
@@ -174,59 +182,51 @@ struct Board<const WIDTH: usize, const HEIGHT: usize> {
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     fn tick(&mut self) {
-        for (movement, coord) in self.hazzards.iter_mut() {
-            *coord = coord.move_hazzard(*movement);
+        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
+            *coord = coord.move_hazzard(movement);
         }
         self.count += 1;
     }
 
     fn rewind(&mut self) {
-        for (movement, coord) in self.hazzards.iter_mut() {
+        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
             *coord = coord.move_hazzard(movement.reversed());
         }
         self.count -= 1;
     }
 
-    fn tile_is_safe(&self, coord: Coordinate<WIDTH, HEIGHT>) -> bool {
-        self.hazzards
+    fn tile_is_safe(&self, coord: &Coordinate<WIDTH, HEIGHT>) -> bool {
+        !self
+            .hazzards
             .iter()
-            .any(|&(_, hazzard_coord)| hazzard_coord == coord)
+            .any(|(_, hazzard_coord)| hazzard_coord.eq(coord))
     }
 
     fn solve(&mut self) -> usize {
         let entrance = Coordinate::new_unchecked(0, 0);
 
-        let mut current: VecDeque<(Coordinate<WIDTH, HEIGHT>, [Option<PlayerMovement>; 5])> =
-            VecDeque::new();
-        let mut next: VecDeque<(Coordinate<WIDTH, HEIGHT>, [Option<PlayerMovement>; 5])> =
-            VecDeque::new();
+        let mut current: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
+        let mut next: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
 
         loop {
             self.tick();
 
-            if self.tile_is_safe(entrance) {
-                next.push_back((
-                    entrance,
-                    [Some(PlayerMovement::Wait), None, None, None, None],
-                ));
+            if self.tile_is_safe(&entrance) {
+                next.insert(entrance);
             }
 
-            for (player_location, movement_possibilities) in current.drain(..) {
-                for c in movement_possibilities
-                    .into_iter()
-                    .filter_map(identity)
-                    .filter_map(|m| player_location.move_player(m))
-                {
-                    if let Some(moves) = self.find_moves(c) {
-                        if moves
-                            .iter()
-                            .copied()
-                            .filter_map(identity)
-                            .any(|m| c.move_player(m) == Some(Coordinate::MAX))
-                        {
-                            return self.count;
+            for player_location in current.drain() {
+                if let Some(moves) = self.find_moves(player_location) {
+                    for new_location in moves
+                        .into_iter()
+                        .filter_map(identity)
+                        .filter_map(|m| player_location.move_player(m))
+                    {
+                        if new_location == Coordinate::MAX {
+                            return self.count + 1;
                         }
-                        next.push_back((c, moves));
+
+                        next.insert(new_location);
                     }
                 }
             }
@@ -301,4 +301,104 @@ pub fn main() -> Result<(), String> {
     println!("{}", board.solve());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_INPUT_0: &str = ">>.<^<
+.<..<<
+>v.><>
+<^v^^>";
+
+    const TEST_INPUT_1: &str = ".....
+ >....
+ ...v.";
+
+    const TEST_INPUT_2: &str = "..\n..";
+
+    #[test]
+    fn test_board_from_str() {
+        let board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
+
+        let expected_hazzards: [(HazzardMovement, Coordinate<6, 4>); 19] = [
+            (HazzardMovement::Right, Coordinate::new_unchecked(0, 0)),
+            (HazzardMovement::Right, Coordinate::new_unchecked(1, 0)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(3, 0)),
+            (HazzardMovement::Up, Coordinate::new_unchecked(4, 0)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(5, 0)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(1, 1)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(4, 1)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(5, 1)),
+            (HazzardMovement::Right, Coordinate::new_unchecked(0, 2)),
+            (HazzardMovement::Down, Coordinate::new_unchecked(1, 2)),
+            (HazzardMovement::Right, Coordinate::new_unchecked(3, 2)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(4, 2)),
+            (HazzardMovement::Right, Coordinate::new_unchecked(5, 2)),
+            (HazzardMovement::Left, Coordinate::new_unchecked(0, 3)),
+            (HazzardMovement::Up, Coordinate::new_unchecked(1, 3)),
+            (HazzardMovement::Down, Coordinate::new_unchecked(2, 3)),
+            (HazzardMovement::Up, Coordinate::new_unchecked(3, 3)),
+            (HazzardMovement::Up, Coordinate::new_unchecked(4, 3)),
+            (HazzardMovement::Right, Coordinate::new_unchecked(5, 3)),
+        ];
+
+        assert_eq!(
+            expected_hazzards.len(),
+            board.hazzards.len(),
+            "Expected {} hazzards, but got {} hazzards",
+            expected_hazzards.len(),
+            board.hazzards.len()
+        );
+        for hazzard in expected_hazzards {
+            assert!(
+                board.hazzards.contains(&hazzard),
+                "Parsed board should contain the hazzard {:?}",
+                hazzard
+            );
+        }
+    }
+
+    #[test]
+    fn test_tile_is_safe_0() {
+        let mut board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
+        assert!(
+            !board.tile_is_safe(&Coordinate { x: 0, y: 0 }),
+            "The entrance is not safe in this test case."
+        );
+    }
+
+    #[test]
+    fn test_tile_is_safe_1() {
+        let mut board: Board<2, 2> = TEST_INPUT_2.parse().unwrap();
+        assert!(
+            board.tile_is_safe(&Coordinate { x: 0, y: 0 }),
+            "The entrance is safe in this test case."
+        );
+    }
+
+    #[test]
+    fn test_board_solve_0() {
+        let mut board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
+
+        let result = board.solve();
+        assert_eq!(18, result, "The expected solution is 18. Got {}", result);
+    }
+
+    #[test]
+    fn test_board_solve_1() {
+        let mut board: Board<5, 3> = TEST_INPUT_1.parse().unwrap();
+
+        let result = board.solve();
+        assert_eq!(8, result, "The expected solution is 8. Got {}", result);
+    }
+
+    #[test]
+    fn test_board_solve_2() {
+        let mut board: Board<2, 2> = TEST_INPUT_2.parse().unwrap();
+
+        let result = board.solve();
+        assert_eq!(4, result, "The expected solution is 4. Got {}", result);
+    }
 }
