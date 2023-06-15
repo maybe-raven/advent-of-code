@@ -1,15 +1,8 @@
 //! Day 24: Blizzard Basin
 //! https://adventofcode.com/2022/day/24
 
-#![allow(unused, dead_code)]
-use std::{
-    cmp::min,
-    collections::{HashSet, VecDeque},
-    convert::identity,
-    fs,
-    ops::Index,
-    str::FromStr,
-};
+// #![allow(unused, dead_code)]
+use std::{collections::HashSet, convert::identity, fs, str::FromStr};
 
 trait CheckedDec {
     fn checked_dec(self) -> Self;
@@ -25,37 +18,12 @@ impl CheckedDec for usize {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum PlayerMovement {
-    Up,
-    Down,
-    Left,
-    Right,
-    Wait,
-}
-
-impl PlayerMovement {
-    const MEMBERS: [PlayerMovement; 5] =
-        [Self::Up, Self::Down, Self::Left, Self::Right, Self::Wait];
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HazzardMovement {
     Up,
     Down,
     Left,
     Right,
-}
-
-impl HazzardMovement {
-    fn reversed(self) -> Self {
-        match self {
-            Self::Up => Self::Down,
-            Self::Down => Self::Up,
-            Self::Left => Self::Right,
-            Self::Right => Self::Left,
-        }
-    }
 }
 
 impl TryFrom<char> for HazzardMovement {
@@ -92,24 +60,24 @@ struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
 }
 
 impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
+    const MAXX: usize = WIDTH - 1;
+    const MAXY: usize = HEIGHT - 1;
+
     const MAX: Self = Self {
-        x: WIDTH - 1,
-        y: HEIGHT - 1,
+        x: Self::MAXX,
+        y: Self::MAXY,
     };
 
-    fn is_zero(&self) -> bool {
-        self.x == 0 && self.y == 0
-    }
-
     fn new(x: usize, y: usize) -> Self {
-        Self {
-            x: min(x, WIDTH - 1),
-            y: min(y, HEIGHT - 1),
-        }
+        Self { x, y }
     }
 
-    fn new_unchecked(x: usize, y: usize) -> Self {
-        Self { x, y }
+    fn new_checked(x: usize, y: usize) -> Option<Self> {
+        if x > Self::MAXX || y > Self::MAXY {
+            None
+        } else {
+            Some(Self { x, y })
+        }
     }
 
     fn get_neighbors(&self) -> [Option<Self>; 4] {
@@ -147,36 +115,6 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
                 })
             },
         ]
-    }
-
-    fn move_player(self, m: PlayerMovement) -> Option<Self> {
-        match m {
-            PlayerMovement::Up => match self.y {
-                0 => None,
-                y => Some(Self { y: y - 1, ..self }),
-            },
-            PlayerMovement::Down => {
-                let y = self.y + 1;
-                if y == HEIGHT {
-                    None
-                } else {
-                    Some(Self { y, ..self })
-                }
-            }
-            PlayerMovement::Left => match self.x {
-                0 => None,
-                x => Some(Self { x: x - 1, ..self }),
-            },
-            PlayerMovement::Right => {
-                let x = self.x + 1;
-                if x == WIDTH {
-                    None
-                } else {
-                    Some(Self { x, ..self })
-                }
-            }
-            PlayerMovement::Wait => Some(self),
-        }
     }
 
     fn move_hazzard(self, m: HazzardMovement) -> Self {
@@ -222,28 +160,7 @@ pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
 }
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
-    fn tick(&mut self) {
-        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
-            *coord = coord.move_hazzard(movement);
-        }
-        self.count += 1;
-    }
-
-    fn rewind(&mut self) {
-        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
-            *coord = coord.move_hazzard(movement.reversed());
-        }
-        self.count -= 1;
-    }
-
-    fn tile_is_safe(&self, coord: &Coordinate<WIDTH, HEIGHT>) -> bool {
-        !self
-            .hazzards
-            .iter()
-            .any(|(_, hazzard_coord)| hazzard_coord.eq(coord))
-    }
-
-    fn better_tick(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
+    fn tick(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
         for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
             *coord = coord.move_hazzard(movement);
             next_moves.remove(coord);
@@ -252,7 +169,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     }
 
     pub fn solve(&mut self) -> usize {
-        let entrance = Coordinate::new_unchecked(0, 0);
+        let entrance = Coordinate::new(0, 0);
 
         let mut next_moves: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
 
@@ -272,28 +189,8 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
 
             next_moves.insert(entrance);
 
-            self.better_tick(&mut next_moves);
+            self.tick(&mut next_moves);
         }
-    }
-
-    fn find_moves(
-        &self,
-        player_location: Coordinate<WIDTH, HEIGHT>,
-    ) -> Option<[Option<PlayerMovement>; 5]> {
-        let mut movements = PlayerMovement::MEMBERS.map(Some);
-        let moved_player_coordinate =
-            PlayerMovement::MEMBERS.map(|m| player_location.move_player(m));
-
-        for &(_, hazzard_coordinate) in &self.hazzards {
-            let Some(i) = moved_player_coordinate.iter().position(|&c| Some(hazzard_coordinate) == c) else { continue; };
-            movements[i] = None;
-
-            if matches!(movements, [None, None, None, None, None]) {
-                return None;
-            }
-        }
-
-        Some(movements)
     }
 }
 
@@ -301,39 +198,20 @@ impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: Should check input grid size.
         let hazzards = s
             .lines()
             .enumerate()
             .flat_map(|(y, line)| {
                 line.chars().enumerate().filter_map(move |(x, ch)| {
-                    HazzardMovement::try_from(ch)
-                        .map(move |m| (m, Coordinate::new_unchecked(x, y)))
-                        .ok()
+                    let Some(coord) = Coordinate::new_checked(x, y) else { return Some(Err(())); };
+                    let movement = HazzardMovement::try_from(ch).ok()?;
+                    Some(Ok((movement, coord)))
                 })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Self { count: 0, hazzards })
     }
 }
-
-// impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
-//     type Err = ();
-//
-//     fn from_str(s: &str) -> Result<Self, Self::Err> {
-//         todo!()
-//     }
-// }
-
-// impl<const WIDTH: usize, const HEIGHT: usize> Index<Coordinate<WIDTH, HEIGHT>>
-//     for Board<WIDTH, HEIGHT>
-// {
-//     type Output = Movement;
-//
-//     fn index(&self, index: Coordinate<WIDTH, HEIGHT>) -> &Self::Output {
-//         &self.0[index.y][index.x]
-//     }
-// }
 
 pub fn main() -> Result<(), String> {
     const INPUT_FILENAME: &str = "input/blizzard_basin.txt";
@@ -364,25 +242,25 @@ mod tests {
         let board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
 
         let expected_hazzards: [(HazzardMovement, Coordinate<6, 4>); 19] = [
-            (HazzardMovement::Right, Coordinate::new_unchecked(0, 0)),
-            (HazzardMovement::Right, Coordinate::new_unchecked(1, 0)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(3, 0)),
-            (HazzardMovement::Up, Coordinate::new_unchecked(4, 0)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(5, 0)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(1, 1)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(4, 1)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(5, 1)),
-            (HazzardMovement::Right, Coordinate::new_unchecked(0, 2)),
-            (HazzardMovement::Down, Coordinate::new_unchecked(1, 2)),
-            (HazzardMovement::Right, Coordinate::new_unchecked(3, 2)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(4, 2)),
-            (HazzardMovement::Right, Coordinate::new_unchecked(5, 2)),
-            (HazzardMovement::Left, Coordinate::new_unchecked(0, 3)),
-            (HazzardMovement::Up, Coordinate::new_unchecked(1, 3)),
-            (HazzardMovement::Down, Coordinate::new_unchecked(2, 3)),
-            (HazzardMovement::Up, Coordinate::new_unchecked(3, 3)),
-            (HazzardMovement::Up, Coordinate::new_unchecked(4, 3)),
-            (HazzardMovement::Right, Coordinate::new_unchecked(5, 3)),
+            (HazzardMovement::Right, Coordinate::new(0, 0)),
+            (HazzardMovement::Right, Coordinate::new(1, 0)),
+            (HazzardMovement::Left, Coordinate::new(3, 0)),
+            (HazzardMovement::Up, Coordinate::new(4, 0)),
+            (HazzardMovement::Left, Coordinate::new(5, 0)),
+            (HazzardMovement::Left, Coordinate::new(1, 1)),
+            (HazzardMovement::Left, Coordinate::new(4, 1)),
+            (HazzardMovement::Left, Coordinate::new(5, 1)),
+            (HazzardMovement::Right, Coordinate::new(0, 2)),
+            (HazzardMovement::Down, Coordinate::new(1, 2)),
+            (HazzardMovement::Right, Coordinate::new(3, 2)),
+            (HazzardMovement::Left, Coordinate::new(4, 2)),
+            (HazzardMovement::Right, Coordinate::new(5, 2)),
+            (HazzardMovement::Left, Coordinate::new(0, 3)),
+            (HazzardMovement::Up, Coordinate::new(1, 3)),
+            (HazzardMovement::Down, Coordinate::new(2, 3)),
+            (HazzardMovement::Up, Coordinate::new(3, 3)),
+            (HazzardMovement::Up, Coordinate::new(4, 3)),
+            (HazzardMovement::Right, Coordinate::new(5, 3)),
         ];
 
         assert_eq!(
@@ -399,24 +277,6 @@ mod tests {
                 hazzard
             );
         }
-    }
-
-    #[test]
-    fn test_tile_is_safe_0() {
-        let mut board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
-        assert!(
-            !board.tile_is_safe(&Coordinate { x: 0, y: 0 }),
-            "The entrance is not safe in this test case."
-        );
-    }
-
-    #[test]
-    fn test_tile_is_safe_1() {
-        let mut board: Board<2, 2> = TEST_INPUT_2.parse().unwrap();
-        assert!(
-            board.tile_is_safe(&Coordinate { x: 0, y: 0 }),
-            "The entrance is safe in this test case."
-        );
     }
 
     #[test]
