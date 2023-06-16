@@ -1,8 +1,13 @@
 //! Day 24: Blizzard Basin
 //! https://adventofcode.com/2022/day/24
 
-// #![allow(unused, dead_code)]
-use std::{collections::HashSet, convert::identity, fs, str::FromStr};
+use std::{
+    collections::HashSet,
+    fmt::Display,
+    fs,
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 trait CheckedDec {
     fn checked_dec(self) -> Self;
@@ -40,15 +45,19 @@ impl TryFrom<char> for HazzardMovement {
     }
 }
 
-// struct Hazzard {
-//     movement: Movement,
-//     coordinate: Coordinate,
-// }
-//
-// impl Hazzard {}
+impl From<HazzardMovement> for char {
+    fn from(value: HazzardMovement) -> Self {
+        match value {
+            HazzardMovement::Up => '^',
+            HazzardMovement::Down => 'v',
+            HazzardMovement::Left => '<',
+            HazzardMovement::Right => '>',
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
+pub struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
     x: usize,
     y: usize,
 }
@@ -57,16 +66,18 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
     const MAXX: usize = WIDTH - 1;
     const MAXY: usize = HEIGHT - 1;
 
-    const MAX: Self = Self {
+    pub const MAX: Self = Self {
         x: Self::MAXX,
         y: Self::MAXY,
     };
 
-    fn new(x: usize, y: usize) -> Self {
+    pub const MIN: Self = Self { x: 0, y: 0 };
+
+    pub fn new(x: usize, y: usize) -> Self {
         Self { x, y }
     }
 
-    fn new_checked(x: usize, y: usize) -> Option<Self> {
+    pub fn new_checked(x: usize, y: usize) -> Option<Self> {
         if x > Self::MAXX || y > Self::MAXY {
             None
         } else {
@@ -154,7 +165,14 @@ pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
 }
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
-    fn tick(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
+    fn tick(&mut self) {
+        for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
+            *coord = coord.move_hazzard(movement);
+        }
+        self.count += 1;
+    }
+
+    fn tick_filter(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
         for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
             *coord = coord.move_hazzard(movement);
             next_moves.remove(coord);
@@ -162,29 +180,74 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         self.count += 1;
     }
 
-    pub fn solve(&mut self) -> usize {
-        let entrance = Coordinate::new(0, 0);
-
+    pub fn solve(
+        &mut self,
+        start_coord: Coordinate<WIDTH, HEIGHT>,
+        end_coord: Coordinate<WIDTH, HEIGHT>,
+    ) -> usize {
         let mut next_moves: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
 
         loop {
+            // println!("Iteration: {}", self.count);
+            // println!("{}", self);
+            // println!();
+
             for player_location in next_moves.clone() {
-                if player_location == Coordinate::MAX {
-                    return self.count + 1;
+                if player_location == end_coord {
+                    self.tick();
+                    return self.count;
                 }
 
-                next_moves.extend(
-                    player_location
-                        .get_neighbors()
-                        .into_iter()
-                        .flat_map(identity),
-                );
+                next_moves.extend(player_location.get_neighbors().into_iter().flatten());
             }
 
-            next_moves.insert(entrance);
+            next_moves.insert(start_coord);
 
-            self.tick(&mut next_moves);
+            self.tick_filter(&mut next_moves);
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DisplayTile {
+    Count(u32),
+    Hazzard(HazzardMovement),
+}
+
+impl Default for DisplayTile {
+    fn default() -> Self {
+        Self::Count(0)
+    }
+}
+
+impl From<DisplayTile> for char {
+    fn from(value: DisplayTile) -> Self {
+        match value {
+            DisplayTile::Count(0) => '.',
+            DisplayTile::Count(count) => char::from_digit(count, 10).unwrap_or('*'),
+            DisplayTile::Hazzard(m) => char::from(m),
+        }
+    }
+}
+
+impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut grid = [[DisplayTile::default(); WIDTH]; HEIGHT];
+
+        for &(movement, coord) in self.hazzards.iter() {
+            let tile = &mut grid[coord];
+            *tile = match tile {
+                DisplayTile::Count(0) => DisplayTile::Hazzard(movement),
+                DisplayTile::Hazzard(_) => DisplayTile::Count(2),
+                DisplayTile::Count(count) => DisplayTile::Count(*count + 1),
+            };
+        }
+
+        let grid = grid
+            .map(|row| row.into_iter().map(char::from).collect::<String>())
+            .join("\n");
+
+        write!(f, "{}", grid)
     }
 }
 
@@ -207,11 +270,31 @@ impl<const WIDTH: usize, const HEIGHT: usize> FromStr for Board<WIDTH, HEIGHT> {
     }
 }
 
+impl<const WIDTH: usize, const HEIGHT: usize, T> Index<Coordinate<WIDTH, HEIGHT>>
+    for [[T; WIDTH]; HEIGHT]
+{
+    type Output = T;
+
+    fn index(&self, index: Coordinate<WIDTH, HEIGHT>) -> &Self::Output {
+        self.index(index.y).index(index.x)
+    }
+}
+
+impl<const WIDTH: usize, const HEIGHT: usize, T> IndexMut<Coordinate<WIDTH, HEIGHT>>
+    for [[T; WIDTH]; HEIGHT]
+{
+    fn index_mut(&mut self, index: Coordinate<WIDTH, HEIGHT>) -> &mut Self::Output {
+        self.index_mut(index.y).index_mut(index.x)
+    }
+}
+
 pub fn main() -> Result<(), String> {
     const INPUT_FILENAME: &str = "input/blizzard_basin.txt";
     let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
     let mut board: Board<100, 35> = input.parse().expect("We choose the correct input here.");
-    println!("{}", board.solve());
+    println!("{}", board.solve(Coordinate::MIN, Coordinate::MAX));
+    println!("{}", board.solve(Coordinate::MAX, Coordinate::MIN));
+    println!("{}", board.solve(Coordinate::MIN, Coordinate::MAX));
 
     Ok(())
 }
@@ -226,8 +309,8 @@ mod tests {
 <^v^^>";
 
     const TEST_INPUT_1: &str = ".....
- >....
- ...v.";
+>....
+...v.";
 
     const TEST_INPUT_2: &str = "..\n..";
 
@@ -277,23 +360,27 @@ mod tests {
     fn test_board_solve_0() {
         let mut board: Board<6, 4> = TEST_INPUT_0.parse().unwrap();
 
-        let result = board.solve();
-        assert_eq!(18, result, "The expected solution is 18. Got {}", result);
+        let result = board.solve(Coordinate::MIN, Coordinate::MAX);
+        assert_eq!(18, result, "Hazzards in the board: {:?}", board.hazzards);
+        let result = board.solve(Coordinate::MAX, Coordinate::MIN);
+        assert_eq!(41, result, "Hazzards in the board: {:?}", board.hazzards);
+        let result = board.solve(Coordinate::MIN, Coordinate::MAX);
+        assert_eq!(54, result, "Hazzards in the board: {:?}", board.hazzards);
     }
 
     #[test]
     fn test_board_solve_1() {
         let mut board: Board<5, 3> = TEST_INPUT_1.parse().unwrap();
 
-        let result = board.solve();
-        assert_eq!(8, result, "The expected solution is 8. Got {}", result);
+        let result = board.solve(Coordinate::MIN, Coordinate::MAX);
+        assert_eq!(9, result, "Hazzards in the board: {:?}", board.hazzards);
     }
 
     #[test]
     fn test_board_solve_2() {
         let mut board: Board<2, 2> = TEST_INPUT_2.parse().unwrap();
 
-        let result = board.solve();
+        let result = board.solve(Coordinate::MIN, Coordinate::MAX);
         assert_eq!(4, result, "Hazzards in the board: {:?}", board.hazzards);
     }
 }

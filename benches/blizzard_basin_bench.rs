@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use adventofrust::blizzard_basin::Board;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use adventofrust::blizzard_basin::{Board, Coordinate};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 const INPUT: &str = ">^<.v^^v>>^>vv..<><v.<^<^<v.^>>^<>>><><<>^v^>.^<>><<^vv><^<>>vv^v.<.^v><<<>.<v><<^v<v^<>.<vv<>vv<<v>
 <v<vv><^>v<><.<<^^<>^>v<^vvvv^<<v<<^.^.^>.<><^><<^v<^><<v>vv<<>>>^.^<>>>^vvv^><^v^^>>><<vvv>><<><><.
@@ -46,7 +46,7 @@ fn benchmark_setup(c: &mut Criterion) {
         b.iter_batched(
             || board.clone(),
             |mut board| {
-                assert_eq!(238, board.solve());
+                assert_eq!(238, board.solve(Coordinate::MIN, Coordinate::MAX));
             },
             criterion::BatchSize::SmallInput,
         )
