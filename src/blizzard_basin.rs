@@ -47,12 +47,6 @@ impl TryFrom<char> for HazzardMovement {
 //
 // impl Hazzard {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Coord {
-    x: usize,
-    y: usize,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
     x: usize,
