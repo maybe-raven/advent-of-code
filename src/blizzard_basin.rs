@@ -2,7 +2,7 @@
 //! https://adventofcode.com/2022/day/24
 
 use std::{
-    collections::HashSet,
+    collections::BTreeSet,
     fmt::Display,
     fs,
     ops::{Index, IndexMut},
@@ -56,7 +56,7 @@ impl From<HazzardMovement> for char {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Coordinate<const WIDTH: usize, const HEIGHT: usize> {
     x: usize,
     y: usize,
@@ -172,7 +172,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         self.count += 1;
     }
 
-    fn tick_filter(&mut self, next_moves: &mut HashSet<Coordinate<WIDTH, HEIGHT>>) {
+    fn tick_filter(&mut self, next_moves: &mut BTreeSet<Coordinate<WIDTH, HEIGHT>>) {
         for &mut (movement, ref mut coord) in self.hazzards.iter_mut() {
             *coord = coord.move_hazzard(movement);
             next_moves.remove(coord);
@@ -185,7 +185,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         start_coord: Coordinate<WIDTH, HEIGHT>,
         end_coord: Coordinate<WIDTH, HEIGHT>,
     ) -> usize {
-        let mut next_moves: HashSet<Coordinate<WIDTH, HEIGHT>> = HashSet::new();
+        let mut next_moves: BTreeSet<Coordinate<WIDTH, HEIGHT>> = BTreeSet::new();
 
         loop {
             // println!("Iteration: {}", self.count);
