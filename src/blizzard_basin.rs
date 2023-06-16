@@ -208,30 +208,30 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum DisplayTile {
-    Count(u32),
-    Hazzard(HazzardMovement),
-}
-
-impl Default for DisplayTile {
-    fn default() -> Self {
-        Self::Count(0)
-    }
-}
-
-impl From<DisplayTile> for char {
-    fn from(value: DisplayTile) -> Self {
-        match value {
-            DisplayTile::Count(0) => '.',
-            DisplayTile::Count(count) => char::from_digit(count, 10).unwrap_or('*'),
-            DisplayTile::Hazzard(m) => char::from(m),
-        }
-    }
-}
-
 impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[derive(Debug, Clone, Copy)]
+        enum DisplayTile {
+            Count(u32),
+            Hazzard(HazzardMovement),
+        }
+
+        impl Default for DisplayTile {
+            fn default() -> Self {
+                Self::Count(0)
+            }
+        }
+
+        impl From<DisplayTile> for char {
+            fn from(value: DisplayTile) -> Self {
+                match value {
+                    DisplayTile::Count(0) => '.',
+                    DisplayTile::Count(count) => char::from_digit(count, 10).unwrap_or('*'),
+                    DisplayTile::Hazzard(m) => char::from(m),
+                }
+            }
+        }
+
         let mut grid = [[DisplayTile::default(); WIDTH]; HEIGHT];
 
         for &(movement, coord) in self.hazzards.iter() {
