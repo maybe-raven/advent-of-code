@@ -158,6 +158,12 @@ impl<const WIDTH: usize, const HEIGHT: usize> Coordinate<WIDTH, HEIGHT> {
     }
 }
 
+impl<const WIDTH: usize, const HEIGHT: usize> Display for Coordinate<WIDTH, HEIGHT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
     count: usize,
