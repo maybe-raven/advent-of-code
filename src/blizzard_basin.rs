@@ -253,7 +253,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
             .map(|row| row.into_iter().map(char::from).collect::<String>())
             .join("\n");
 
-        write!(f, "{}", grid)
+        f.write_str(&grid)
     }
 }
 
