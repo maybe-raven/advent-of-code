@@ -150,8 +150,8 @@ impl Board {
     }
 
     fn tick(&mut self) {
-        for y in 0..self.board.len() {
-            for x in 0..self.board[y].len() {
+        for y in 1..self.board.len() - 1 {
+            for x in 1..self.board[y].len() - 1 {
                 let coord = Coordinate::new(x, y);
 
                 if self[coord] != Tile::Occupied {
@@ -182,9 +182,9 @@ impl Board {
             }
         }
 
-        let mut x = 0;
         let mut y = 0;
         while y < self.board.len() {
+            let mut x = 0;
             while x < self.board[y].len() {
                 let coord = Coordinate::new(x, y);
                 let tile = self.index_mut(coord);
@@ -212,30 +212,36 @@ impl Board {
     }
 
     fn maybe_expand(&mut self, x: &mut usize, y: &mut usize) {
-        if *y == 0 {
+        if *x == 0 {
             self.board
                 .iter_mut()
                 .for_each(|row| row.push_front(Tile::Empty));
-            *y = 1;
-        } else if *y == self.board.len() - 1 {
+            *x = 1;
+        } else if *x == self.width() - 1 {
             self.board
                 .iter_mut()
                 .for_each(|row| row.push_back(Tile::Empty));
-            *y = self.board.len() - 2;
         }
 
-        let width = self.board[0].len();
-        if *x == 0 {
+        let width = self.width();
+        if *y == 0 {
             let mut v = VecDeque::with_capacity(width);
             v.resize(width, Tile::Empty);
             self.board.push_front(v);
-            *x = 1;
-        } else if *x == width - 1 {
+            *y = 1;
+        } else if *y == self.height() - 1 {
             let mut v = VecDeque::with_capacity(width);
             v.resize(width, Tile::Empty);
-            self.board.push_front(v);
-            *x = width - 1;
+            self.board.push_back(v);
         }
+    }
+
+    fn width(&self) -> usize {
+        self.board.front().map(|x| x.len()).unwrap_or(0)
+    }
+
+    fn height(&self) -> usize {
+        self.board.len()
     }
 
     fn tile_is_border(&self, coord: Coordinate) -> Option<[Option<Direction>; 2]> {
@@ -327,3 +333,26 @@ impl Display for Board {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const INPUT_0: &str = ".##
+.#.
+...
+.##";
+
+    #[test]
+    fn test_case_0() {
+        let mut board: Board = INPUT_0.parse().unwrap();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+    }
+}
