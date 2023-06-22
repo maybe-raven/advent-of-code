@@ -290,15 +290,24 @@ impl FromStr for Board {
         let input_width = lines.next().ok_or(())?.len();
         let input_height = lines.count() + 1;
 
-        let board: VecDeque<VecDeque<Tile>> = s
-            .lines()
-            .map(|line| {
-                if line.len() != input_width {
-                    return Err(());
-                }
+        let iter = s.lines().map(|line| {
+            if line.len() != input_width {
+                return Err(());
+            }
 
-                line.chars().map(Tile::try_from).collect()
-            })
+            once('.')
+                .chain(line.chars())
+                .chain(once('.'))
+                .map(Tile::try_from)
+                .collect()
+        });
+
+        let board_width = input_width + 2;
+        let mut padding = VecDeque::with_capacity(board_width);
+        padding.resize(board_width, Tile::Empty);
+        let board: VecDeque<VecDeque<Tile>> = once(Ok(padding.clone()))
+            .chain(iter)
+            .chain(once(Ok(padding)))
             .collect::<Result<_, Self::Err>>()?;
 
         Ok(Self { board, turn: 0 })
