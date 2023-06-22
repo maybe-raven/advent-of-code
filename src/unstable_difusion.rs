@@ -6,6 +6,8 @@
 use std::{
     collections::{hash_map::OccupiedEntry, VecDeque},
     convert::identity,
+    fmt::{Display, Write},
+    iter::once,
     ops::{Index, IndexMut},
     str::FromStr,
 };
@@ -91,6 +93,12 @@ impl Coordinate {
     }
 }
 
+impl Display for Coordinate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tile {
     Empty,
@@ -111,6 +119,24 @@ impl TryFrom<char> for Tile {
     }
 }
 
+impl Display for Tile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char(char::from(*self))
+    }
+}
+
+impl From<Tile> for char {
+    fn from(value: Tile) -> Self {
+        match value {
+            Tile::Empty => '.',
+            Tile::Occupied => '#',
+            Tile::Proposed(_) => '?',
+            Tile::Blocked => 'x',
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Board {
     board: VecDeque<VecDeque<Tile>>,
     turn: usize,
@@ -278,3 +304,17 @@ impl FromStr for Board {
         Ok(Self { board, turn: 0 })
     }
 }
+
+impl Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Turn: {}", self.turn)?;
+
+        let s: String = self
+            .board
+            .iter()
+            .flat_map(|row| row.iter().copied().map(char::from).chain(once('\n')))
+            .collect();
+        f.write_str(&s)
+    }
+}
+
