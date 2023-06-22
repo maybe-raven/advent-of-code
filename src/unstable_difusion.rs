@@ -107,6 +107,16 @@ enum Tile {
     Blocked,
 }
 
+impl Tile {
+    fn is_occupied(self) -> bool {
+        matches!(self, Tile::Occupied)
+    }
+
+    fn is_empty(self) -> bool {
+        matches!(self, Tile::Empty)
+    }
+}
+
 impl TryFrom<char> for Tile {
     type Error = ();
 
@@ -272,6 +282,57 @@ impl Board {
             .into_iter()
             .any(|c| self[c] == Tile::Occupied)
     }
+
+    fn empty_count(&self) -> usize {
+        let left_padding = self.count_left_padding();
+        let right_padding = self.count_right_padding();
+        let top_padding = self.count_top_padding();
+        let bottom_padding = self.count_bottom_padding();
+
+        self.board
+            .iter()
+            .skip(top_padding)
+            .take(self.height() - top_padding - bottom_padding)
+            .map(|row| {
+                row.iter()
+                    .skip(left_padding)
+                    .take(self.width() - left_padding - right_padding)
+                    .filter(|&&x| x.is_empty())
+                    .count()
+            })
+            .sum()
+    }
+
+    fn count_bottom_padding(&self) -> usize {
+        self.board
+            .iter()
+            .rev()
+            .position(|row| row.iter().copied().any(Tile::is_occupied))
+            .unwrap_or(0)
+    }
+
+    fn count_top_padding(&self) -> usize {
+        self.board
+            .iter()
+            .position(|row| row.iter().copied().any(Tile::is_occupied))
+            .unwrap_or(0)
+    }
+
+    fn count_left_padding(&self) -> usize {
+        self.board
+            .iter()
+            .filter_map(|row| row.iter().copied().position(Tile::is_occupied))
+            .min()
+            .unwrap()
+    }
+
+    fn count_right_padding(&self) -> usize {
+        self.board
+            .iter()
+            .filter_map(|row| row.iter().rev().copied().position(Tile::is_occupied))
+            .min()
+            .unwrap()
+    }
 }
 
 impl Index<Coordinate> for Board {
@@ -354,5 +415,20 @@ mod tests {
         println!("{}", board);
         board.tick();
         println!("{}", board);
+    }
+
+    #[test]
+    fn test_count() {
+        let mut board: Board = INPUT_0.parse().unwrap();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        board.tick();
+        println!("{}", board);
+        assert_eq!(1, board.count_left_padding());
+        assert_eq!(1, board.count_right_padding());
+        assert_eq!(25, board.empty_count());
     }
 }
