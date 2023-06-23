@@ -45,7 +45,7 @@ impl Coordinate {
         Coordinate { x, y }
     }
 
-    fn transform(&self, direction: Direction) -> Self {
+    fn translate(&self, direction: Direction) -> Self {
         match direction {
             Direction::North => Self::new(self.x, self.y - 1),
             Direction::South => Self::new(self.x, self.y + 1),
@@ -54,32 +54,7 @@ impl Coordinate {
         }
     }
 
-    fn get_neighbors(&self, direction: Direction) -> [Self; 3] {
-        match direction {
-            Direction::North => [
-                Coordinate::new(self.x - 1, self.y - 1), // NW
-                Coordinate::new(self.x, self.y - 1),     // N
-                Coordinate::new(self.x + 1, self.y - 1), // NE
-            ],
-            Direction::South => [
-                Coordinate::new(self.x - 1, self.y + 1), // SW
-                Coordinate::new(self.x, self.y + 1),     // S
-                Coordinate::new(self.x + 1, self.y + 1), // SE
-            ],
-            Direction::West => [
-                Coordinate::new(self.x - 1, self.y - 1), // NW
-                Coordinate::new(self.x - 1, self.y),     // W
-                Coordinate::new(self.x - 1, self.y + 1), // SW
-            ],
-            Direction::East => [
-                Coordinate::new(self.x + 1, self.y - 1), // NE
-                Coordinate::new(self.x + 1, self.y),     // E
-                Coordinate::new(self.x + 1, self.y + 1), // SE
-            ],
-        }
-    }
-
-    fn get_all_neighbors(&self) -> [Self; 8] {
+    fn get_neighbors(&self) -> [Self; 8] {
         [
             Coordinate::new(self.x - 1, self.y - 1), // NW
             Coordinate::new(self.x, self.y - 1),     // N
@@ -164,29 +139,33 @@ impl Board {
     }
 
     fn tick(&mut self) -> bool {
-        for y in 1..self.board.len() - 1 {
-            for x in 1..self.board[y].len() - 1 {
+        let width = self.width();
+        for y in 1..self.height() - 1 {
+            for x in 1..width - 1 {
                 let coord = Coordinate::new(x, y);
 
                 if self[coord] != Tile::Occupied {
                     continue;
                 }
 
-                if !self.tile_has_neighbors(coord) {
+                let availabilities = self.get_movement_availabilities(&coord);
+                if availabilities == [true, true, true, true] {
                     continue;
                 }
 
-                let Some(direction) = Direction::MEMBERS
+                let Some((direction, _)) = Direction::MEMBERS
                     .into_iter()
+                    .zip(availabilities)
                     .cycle()
                     .skip(self.turn % 4)
                     .take(4)
-                    .find(|d| self.check_direction(coord, *d))
+                    .find(|x| x.1)
                 else {
                     continue;
                 };
 
-                let tile = self.index_mut(coord.transform(direction));
+                let target_coord = coord.translate(direction);
+                let tile = self.index_mut(target_coord);
                 match *tile {
                     Tile::Empty => *tile = Tile::Proposed(direction.reversed()),
                     Tile::Proposed(_) => *tile = Tile::Blocked,
@@ -198,9 +177,9 @@ impl Board {
 
         let mut should_continue = false;
         let mut y = 0;
-        while y < self.board.len() {
+        while y < self.height() {
             let mut x = 0;
-            while x < self.board[y].len() {
+            while x < self.width() {
                 let coord = Coordinate::new(x, y);
                 let tile = self.index_mut(coord);
 
@@ -209,7 +188,7 @@ impl Board {
                     Tile::Proposed(direction) => {
                         should_continue = true;
                         *tile = Tile::Occupied;
-                        self[coord.transform(direction)] = Tile::Empty;
+                        self[coord.translate(direction)] = Tile::Empty;
                         self.maybe_expand(&mut x, &mut y);
                     }
                     Tile::Occupied => self.maybe_expand(&mut x, &mut y),
@@ -227,6 +206,11 @@ impl Board {
         self.turn += 1;
 
         should_continue
+    }
+
+    fn get_movement_availabilities(&self, coord: &Coordinate) -> [bool; 4] {
+        let [nw, n, ne, w, e, sw, s, se] = coord.get_neighbors().map(|x| !self[x].is_occupied());
+        [nw && n && ne, sw && s && se, nw && w && sw, ne && e && se]
     }
 
     fn maybe_expand(&mut self, x: &mut usize, y: &mut usize) {
@@ -262,36 +246,7 @@ impl Board {
         self.board.len()
     }
 
-    fn tile_is_border(&self, coord: Coordinate) -> Option<[Option<Direction>; 2]> {
-        match coord {
-            Coordinate { x: 0, y: 0 } => Some([Some(Direction::North), Some(Direction::West)]),
-            Coordinate { x: 0, y } if y == self.board.len() - 1 => {
-                Some([Some(Direction::West), Some(Direction::South)])
-            }
-            Coordinate { x: 0, .. } => Some([Some(Direction::West), None]),
-            Coordinate { x, y: 0 } if x == self.board[0].len() - 1 => {
-                Some([Some(Direction::West), Some(Direction::South)])
-            }
-
-            _ => unimplemented!(),
-        }
-    }
-
-    fn check_direction(&self, coord: Coordinate, direction: Direction) -> bool {
-        !coord
-            .get_neighbors(direction)
-            .into_iter()
-            .any(|c| self[c] == Tile::Occupied)
-    }
-
-    fn tile_has_neighbors(&self, coord: Coordinate) -> bool {
-        coord
-            .get_all_neighbors()
-            .into_iter()
-            .any(|c| self[c] == Tile::Occupied)
-    }
-
-    fn empty_count(&self) -> usize {
+    fn count_empty_tiles(&self) -> usize {
         let left_padding = self.count_left_padding();
         let right_padding = self.count_right_padding();
         let top_padding = self.count_top_padding();
@@ -409,7 +364,7 @@ pub fn main() -> Result<(), String> {
     let mut board: Board = input.parse().map_err(|_| "Parse error.")?;
     board.run();
     println!("{}", board);
-    println!("{}", board.empty_count());
+    println!("{}", board.count_empty_tiles());
     println!("{}", board.turn);
 
     Ok(())
@@ -419,10 +374,10 @@ pub fn main() -> Result<(), String> {
 mod tests {
     use super::*;
 
-    const INPUT_0: &str = ".##
-.#.
-...
-.##";
+    const INPUT_0: &str = "##
+#.
+..
+##";
 
     const INPUT_1: &str = "....#..
 ..###.#
@@ -431,6 +386,24 @@ mod tests {
 #.###..
 ##.#.##
 .#..#..";
+
+    #[test]
+    fn test_movement_availabilities() {
+        let mut board: Board = INPUT_0.parse().unwrap();
+        // println!("{}", board);
+        assert_eq!(
+            [true, false, true, false],
+            board.get_movement_availabilities(&Coordinate::new(1, 1))
+        );
+        assert_eq!(
+            [true, false, false, true],
+            board.get_movement_availabilities(&Coordinate::new(2, 1))
+        );
+        assert_eq!(
+            [true, true, true, false],
+            board.get_movement_availabilities(&Coordinate::new(1, 4))
+        );
+    }
 
     #[test]
     fn test_case_0() {
@@ -459,16 +432,17 @@ mod tests {
     #[test]
     fn test_count_0() {
         let mut board: Board = INPUT_0.parse().unwrap();
-        board.iterate(10);
+        board.iterate(3);
+        println!("{}", board);
         assert_eq!(1, board.count_left_padding());
         assert_eq!(1, board.count_right_padding());
-        assert_eq!(25, board.empty_count());
+        assert_eq!(25, board.count_empty_tiles());
     }
 
     #[test]
     fn test_count_1() {
         let mut board: Board = INPUT_1.parse().unwrap();
         board.iterate(10);
-        assert_eq!(110, board.empty_count());
+        assert_eq!(110, board.count_empty_tiles());
     }
 }
