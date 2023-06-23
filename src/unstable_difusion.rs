@@ -403,6 +403,14 @@ mod tests {
 ...
 .##";
 
+    const INPUT_1: &str = "....#..
+..###.#
+#...#.#
+.#...##
+#.###..
+##.#.##
+.#..#..";
+
     #[test]
     fn test_case_0() {
         let mut board: Board = INPUT_0.parse().unwrap();
@@ -418,17 +426,28 @@ mod tests {
     }
 
     #[test]
-    fn test_count() {
+    fn test_case_1() {
+        let mut board: Board = INPUT_1.parse().unwrap();
+        println!("{}", board);
+        for _ in 0..10 {
+            board.tick();
+            println!("{}", board);
+        }
+    }
+
+    #[test]
+    fn test_count_0() {
         let mut board: Board = INPUT_0.parse().unwrap();
-        println!("{}", board);
-        board.tick();
-        println!("{}", board);
-        board.tick();
-        println!("{}", board);
-        board.tick();
-        println!("{}", board);
+        board.run(10);
         assert_eq!(1, board.count_left_padding());
         assert_eq!(1, board.count_right_padding());
         assert_eq!(25, board.empty_count());
+    }
+
+    #[test]
+    fn test_count_1() {
+        let mut board: Board = INPUT_1.parse().unwrap();
+        board.run(10);
+        assert_eq!(110, board.empty_count());
     }
 }
