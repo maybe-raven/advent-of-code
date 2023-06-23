@@ -4,9 +4,9 @@
 #![allow(unused, dead_code)]
 
 use std::{
-    collections::{hash_map::OccupiedEntry, VecDeque},
-    convert::identity,
+    collections::VecDeque,
     fmt::{Display, Write},
+    fs,
     iter::once,
     ops::{Index, IndexMut},
     str::FromStr,
@@ -392,6 +392,19 @@ impl Display for Board {
             .collect();
         f.write_str(&s)
     }
+}
+
+const INPUT_FILENAME: &str = "input/unstable_difusion.txt";
+
+pub fn main() -> Result<(), String> {
+    let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
+    let mut board: Board = input.parse().map_err(|_| "Parse error.")?;
+    board.get_done();
+    println!("{}", board);
+    println!("{}", board.empty_count());
+    println!("{}", board.turn);
+
+    Ok(())
 }
 
 #[cfg(test)]

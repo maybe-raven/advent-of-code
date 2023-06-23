@@ -3,5 +3,5 @@ mod full_of_hot_air;
 mod unstable_difusion;
 
 fn main() -> Result<(), String> {
-    blizzard_basin::main()
+    unstable_difusion::main()
 }
