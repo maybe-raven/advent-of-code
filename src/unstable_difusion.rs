@@ -153,13 +153,17 @@ struct Board {
 }
 
 impl Board {
-    fn run(&mut self, turns: usize) {
+    fn iterate(&mut self, turns: usize) {
         for _ in 0..turns {
             self.tick();
         }
     }
 
-    fn tick(&mut self) {
+    fn run(&mut self) {
+        while self.tick() {}
+    }
+
+    fn tick(&mut self) -> bool {
         for y in 1..self.board.len() - 1 {
             for x in 1..self.board[y].len() - 1 {
                 let coord = Coordinate::new(x, y);
@@ -192,6 +196,7 @@ impl Board {
             }
         }
 
+        let mut should_continue = false;
         let mut y = 0;
         while y < self.board.len() {
             let mut x = 0;
@@ -202,6 +207,7 @@ impl Board {
                 match *tile {
                     Tile::Empty => (),
                     Tile::Proposed(direction) => {
+                        should_continue = true;
                         *tile = Tile::Occupied;
                         self[coord.transform(direction)] = Tile::Empty;
                         self.maybe_expand(&mut x, &mut y);
@@ -219,6 +225,8 @@ impl Board {
         }
 
         self.turn += 1;
+
+        should_continue
     }
 
     fn maybe_expand(&mut self, x: &mut usize, y: &mut usize) {
@@ -399,7 +407,7 @@ const INPUT_FILENAME: &str = "input/unstable_difusion.txt";
 pub fn main() -> Result<(), String> {
     let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
     let mut board: Board = input.parse().map_err(|_| "Parse error.")?;
-    board.get_done();
+    board.run();
     println!("{}", board);
     println!("{}", board.empty_count());
     println!("{}", board.turn);
@@ -451,7 +459,7 @@ mod tests {
     #[test]
     fn test_count_0() {
         let mut board: Board = INPUT_0.parse().unwrap();
-        board.run(10);
+        board.iterate(10);
         assert_eq!(1, board.count_left_padding());
         assert_eq!(1, board.count_right_padding());
         assert_eq!(25, board.empty_count());
@@ -460,7 +468,7 @@ mod tests {
     #[test]
     fn test_count_1() {
         let mut board: Board = INPUT_1.parse().unwrap();
-        board.run(10);
+        board.iterate(10);
         assert_eq!(110, board.empty_count());
     }
 }
