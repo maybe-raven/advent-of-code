@@ -7,6 +7,7 @@ use std::{
     collections::{hash_map::OccupiedEntry, VecDeque},
     convert::identity,
     ops::{Index, IndexMut},
+    str::FromStr,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,6 +97,18 @@ enum Tile {
     Occupied,
     Proposed(Direction),
     Blocked,
+}
+
+impl TryFrom<char> for Tile {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '.' => Ok(Self::Empty),
+            '#' => Ok(Self::Occupied),
+            _ => Err(()),
+        }
+    }
 }
 
 struct Board {
@@ -240,5 +253,28 @@ impl Index<Coordinate> for Board {
 impl IndexMut<Coordinate> for Board {
     fn index_mut(&mut self, Coordinate { x, y }: Coordinate) -> &mut Self::Output {
         self.board.index_mut(y).index_mut(x)
+    }
+}
+
+impl FromStr for Board {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut lines = s.lines();
+        let input_width = lines.next().ok_or(())?.len();
+        let input_height = lines.count() + 1;
+
+        let board: VecDeque<VecDeque<Tile>> = s
+            .lines()
+            .map(|line| {
+                if line.len() != input_width {
+                    return Err(());
+                }
+
+                line.chars().map(Tile::try_from).collect()
+            })
+            .collect::<Result<_, Self::Err>>()?;
+
+        Ok(Self { board, turn: 0 })
     }
 }
