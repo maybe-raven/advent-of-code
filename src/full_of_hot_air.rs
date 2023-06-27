@@ -1,6 +1,7 @@
 //! Day 25: Full of Hot Air
 //! https://adventofcode.com/2022/day/25
 
+#![allow(dead_code)]
 use std::{fmt::Display, fs, iter::repeat, ops::Add, str::FromStr, u8};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

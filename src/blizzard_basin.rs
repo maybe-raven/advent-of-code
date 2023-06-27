@@ -294,6 +294,7 @@ impl<const WIDTH: usize, const HEIGHT: usize, T> IndexMut<Coordinate<WIDTH, HEIG
     }
 }
 
+#[allow(dead_code)]
 pub fn main() -> Result<(), String> {
     const INPUT_FILENAME: &str = "input/blizzard_basin.txt";
     let input = fs::read_to_string(INPUT_FILENAME).map_err(|e| e.to_string())?;
