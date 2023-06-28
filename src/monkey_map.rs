@@ -219,7 +219,7 @@ impl Game {
                         .iter()
                         .enumerate()
                         .cycle()
-                        .skip(self.player.position.y)
+                        .skip(self.player.position.y + 1)
                         .filter_map(|(y, row)| {
                             if let Some(x) = row.get(self.player.position.x).copied().flatten() {
                                 Some((y, x))
@@ -258,7 +258,7 @@ impl Game {
                         .iter()
                         .enumerate()
                         .cycle()
-                        .skip(self.player.position.x)
+                        .skip(self.player.position.x + 1)
                         .filter_map(|(y, &tile)| {
                             if let Some(x) = tile {
                                 Some((y, x))
