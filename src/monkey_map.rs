@@ -334,6 +334,21 @@ pub fn main() -> Result<(), String> {
         .parse()
         .map_err(|_| "error parsing commands")?;
 
+    let board_str: String = game
+        .board
+        .iter()
+        .flat_map(|row| {
+            row.iter()
+                .map(|x| match x {
+                    Some(Tile::Wall) => '#',
+                    Some(Tile::Ground) => '.',
+                    None => 'o',
+                })
+                .chain(once('\n'))
+        })
+        .collect();
+    println!("{}", board_str);
+
     game.run(&commands);
 
     println!("{}", game.get_answer());
@@ -422,6 +437,21 @@ oooooooo......#.\n",
         assert!(matches!(game.player.facing, Facing::Right));
         game.execute(Command::Go(NonZeroUsize::new(5).unwrap()));
         assert_eq!(Coordinate { x: 7, y: 5 }, game.player.position);
+    }
+
+    #[test]
+    fn test_execute_eb() {
+        let mut game: Game = INPUT.parse().unwrap();
+        game.execute(Command::Go(NonZeroUsize::new(10).unwrap()));
+        assert_eq!(Coordinate { x: 10, y: 0 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Counter));
+        assert!(matches!(game.player.facing, Facing::Up));
+        game.execute(Command::Go(NonZeroUsize::new(10).unwrap()));
+        assert_eq!(Coordinate { x: 10, y: 8 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Counter));
+        assert!(matches!(game.player.facing, Facing::Left));
+        game.execute(Command::Go(NonZeroUsize::new(10).unwrap()));
+        assert_eq!(Coordinate { x: 12, y: 8 }, game.player.position);
     }
 
     #[test]
