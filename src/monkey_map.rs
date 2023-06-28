@@ -142,12 +142,13 @@ impl TryFrom<char> for Tile {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Coordinate {
     x: usize,
     y: usize,
 }
 
+#[derive(Debug)]
 struct Player {
     position: Coordinate,
     facing: Facing,
@@ -343,6 +344,106 @@ pub fn main() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const INPUT: &str = "        ...#    
+        .#..    
+        #...    
+        ....    
+...#.......#    
+........#...    
+..#....#....    
+..........#.    
+        ...#....
+        .....#..
+        .#......
+        ......#.";
+
+    #[test]
+    fn test_game_from_str() {
+        let game: Game = INPUT.parse().unwrap();
+        assert_eq!(Coordinate { x: 8, y: 0 }, game.player.position);
+        assert!(matches!(game.player.facing, Facing::Right));
+        let board_str: String = game
+            .board
+            .iter()
+            .flat_map(|row| {
+                row.iter()
+                    .map(|x| match x {
+                        Some(Tile::Wall) => '#',
+                        Some(Tile::Ground) => '.',
+                        None => 'o',
+                    })
+                    .chain(once('\n'))
+            })
+            .collect();
+        assert_eq!(
+            "oooooooo...#oooo
+oooooooo.#..oooo
+oooooooo#...oooo
+oooooooo....oooo
+...#.......#oooo
+........#...oooo
+..#....#....oooo
+..........#.oooo
+oooooooo...#....
+oooooooo.....#..
+oooooooo.#......
+oooooooo......#.\n",
+            board_str
+        );
+    }
+
+    #[test]
+    fn test_execute() {
+        let mut game: Game = INPUT.parse().unwrap();
+        game.execute(Command::Go(NonZeroUsize::new(10).unwrap()));
+        assert_eq!(Coordinate { x: 10, y: 0 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Clockwise));
+        assert!(matches!(game.player.facing, Facing::Down));
+        game.execute(Command::Go(NonZeroUsize::new(5).unwrap()));
+        assert_eq!(Coordinate { x: 10, y: 5 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Counter));
+        assert!(matches!(game.player.facing, Facing::Right));
+        game.execute(Command::Go(NonZeroUsize::new(5).unwrap()));
+        assert_eq!(Coordinate { x: 3, y: 5 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Clockwise));
+        assert!(matches!(game.player.facing, Facing::Down));
+        game.execute(Command::Go(NonZeroUsize::new(10).unwrap()));
+        assert_eq!(Coordinate { x: 3, y: 7 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Counter));
+        assert!(matches!(game.player.facing, Facing::Right));
+        game.execute(Command::Go(NonZeroUsize::new(4).unwrap()));
+        assert_eq!(Coordinate { x: 7, y: 7 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Clockwise));
+        assert!(matches!(game.player.facing, Facing::Down));
+        game.execute(Command::Go(NonZeroUsize::new(5).unwrap()));
+        assert_eq!(Coordinate { x: 7, y: 5 }, game.player.position);
+        game.execute(Command::Turn(Rotation::Counter));
+        assert!(matches!(game.player.facing, Facing::Right));
+        game.execute(Command::Go(NonZeroUsize::new(5).unwrap()));
+        assert_eq!(Coordinate { x: 7, y: 5 }, game.player.position);
+    }
+
+    #[test]
+    fn test_game() {
+        let mut game: Game = INPUT.parse().unwrap();
+        game.run(&[
+            Command::Go(NonZeroUsize::new(10).unwrap()),
+            Command::Turn(Rotation::Clockwise),
+            Command::Go(NonZeroUsize::new(5).unwrap()),
+            Command::Turn(Rotation::Counter),
+            Command::Go(NonZeroUsize::new(5).unwrap()),
+            Command::Turn(Rotation::Clockwise),
+            Command::Go(NonZeroUsize::new(10).unwrap()),
+            Command::Turn(Rotation::Counter),
+            Command::Go(NonZeroUsize::new(4).unwrap()),
+            Command::Turn(Rotation::Clockwise),
+            Command::Go(NonZeroUsize::new(5).unwrap()),
+            Command::Turn(Rotation::Counter),
+            Command::Go(NonZeroUsize::new(5).unwrap()),
+        ]);
+        assert_eq!(6032, game.get_answer());
+    }
 
     #[test]
     fn test_command_list_from_str() {
