@@ -178,9 +178,9 @@ impl Game {
     }
 
     fn execute(&mut self, command: Command) {
-        fn last_index_before_wall(mut iter: impl Iterator<Item = (usize, Tile)>) -> Option<usize> {
+        fn last_index_before_wall(iter: impl Iterator<Item = (usize, Tile)>) -> Option<usize> {
             let mut previous_index = None;
-            while let Some((i, tile)) = iter.next() {
+            for (i, tile) in iter {
                 if matches!(tile, Tile::Wall) {
                     break;
                 }
@@ -202,11 +202,10 @@ impl Game {
                         .cycle()
                         .skip(self.height() - self.player.position.y)
                         .filter_map(|(y, row)| {
-                            if let Some(x) = row.get(self.player.position.x).copied().flatten() {
-                                Some((y, x))
-                            } else {
-                                None
-                            }
+                            row.get(self.player.position.x)
+                                .copied()
+                                .flatten()
+                                .map(|x| (y, x))
                         })
                         .take(n.into());
 
@@ -222,11 +221,10 @@ impl Game {
                         .cycle()
                         .skip(self.player.position.y + 1)
                         .filter_map(|(y, row)| {
-                            if let Some(x) = row.get(self.player.position.x).copied().flatten() {
-                                Some((y, x))
-                            } else {
-                                None
-                            }
+                            row.get(self.player.position.x)
+                                .copied()
+                                .flatten()
+                                .map(|x| (y, x))
                         })
                         .take(n.into());
 
@@ -241,13 +239,7 @@ impl Game {
                         .rev()
                         .cycle()
                         .skip(self.width() - self.player.position.x)
-                        .filter_map(|(y, &tile)| {
-                            if let Some(x) = tile {
-                                Some((y, x))
-                            } else {
-                                None
-                            }
-                        })
+                        .filter_map(|(y, &tile)| tile.map(|x| (y, x)))
                         .take(n.into());
 
                     if let Some(x) = last_index_before_wall(iter) {
@@ -260,13 +252,7 @@ impl Game {
                         .enumerate()
                         .cycle()
                         .skip(self.player.position.x + 1)
-                        .filter_map(|(y, &tile)| {
-                            if let Some(x) = tile {
-                                Some((y, x))
-                            } else {
-                                None
-                            }
-                        })
+                        .filter_map(|(y, &tile)| tile.map(|x| (y, x)))
                         .take(n.into());
 
                     if let Some(x) = last_index_before_wall(iter) {

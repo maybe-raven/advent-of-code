@@ -14,10 +14,10 @@ impl TryFrom<char> for Item {
     type Error = String;
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
-        if ('a'..='z').contains(&value) {
+        if value.is_ascii_lowercase() {
             const LOWER_OFFSET: usize = 'a' as usize;
             Ok(Self(value as usize - LOWER_OFFSET))
-        } else if ('A'..='Z').contains(&value) {
+        } else if value.is_ascii_uppercase() {
             const UPPER_OFFSET: usize = 'A' as usize - 26;
             Ok(Self(value as usize - UPPER_OFFSET))
         } else {

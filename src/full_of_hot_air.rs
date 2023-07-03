@@ -266,9 +266,8 @@ impl Add for SnafuNumber {
         })
         .collect::<Vec<_>>();
 
-        match carry {
-            SnafuCarry::One => result.push(SnafuDigit::One),
-            _ => (),
+        if carry == SnafuCarry::One {
+            result.push(SnafuDigit::One);
         }
 
         Self(result.into_iter().rev().collect())
