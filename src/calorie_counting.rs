@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io::{self, Result};
 
 fn max3(x: usize, (a, b, c): (usize, usize, usize)) -> (usize, usize, usize) {
