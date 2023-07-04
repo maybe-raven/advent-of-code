@@ -6,10 +6,11 @@ mod monkey_map;
 mod rock_paper_scissor;
 mod rucksack_reorganization;
 mod supply_stacks;
+mod tuning_trouble;
 mod unstable_difusion;
 
 fn main() -> Result<(), String> {
-    supply_stacks::main()?;
+    tuning_trouble::main()?;
 
     Ok(())
 }
