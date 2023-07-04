@@ -30,9 +30,10 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
 type DirectoryRef<'a> = Rc<RefCell<Directory<'a>>>;
 type DirectoryWeak<'a> = Weak<RefCell<Directory<'a>>>;
 
-struct Directory<'a> {
-    size: usize,
+pub struct Directory<'a> {
     name: &'a str,
+    size: usize,
+    total_size: Option<usize>,
     parent: Option<DirectoryWeak<'a>>,
     subdirs: Vec<DirectoryRef<'a>>,
 }
@@ -40,8 +41,9 @@ struct Directory<'a> {
 impl<'a> Directory<'a> {
     fn root() -> Self {
         Self {
-            size: 0,
             name: "/",
+            size: 0,
+            total_size: None,
             parent: None,
             subdirs: Vec::new(),
         }
@@ -49,8 +51,9 @@ impl<'a> Directory<'a> {
 
     fn new(name: &'a str, parent: DirectoryWeak<'a>) -> Self {
         Self {
-            size: 0,
             name,
+            size: 0,
+            total_size: None,
             parent: Some(parent),
             subdirs: Vec::new(),
         }
@@ -60,15 +63,33 @@ impl<'a> Directory<'a> {
         self.subdirs.iter().any(|dir| dir.borrow().name == dir_name)
     }
 
-    fn total_size(&self) -> usize {
-        self.subdirs
+    fn total_size(&mut self) -> usize {
+        if let Some(cached_result) = self.total_size {
+            return cached_result;
+        }
+
+        let total_size = self
+            .subdirs
             .iter()
-            .map(|x| x.borrow().total_size())
+            .map(|x| x.borrow_mut().total_size())
             .sum::<usize>()
-            + self.size
+            + self.size;
+        self.total_size = Some(total_size);
+        total_size
     }
 
-    fn get_answer(&self, mut current_best: usize, target: usize) -> usize {
+    fn clear_total_size(&mut self) {
+        if self.total_size.is_none() {
+            return;
+        }
+
+        self.total_size = None;
+
+        let Some(parent) = self.parent.clone() else { return; };
+        parent.upgrade().unwrap().borrow_mut().clear_total_size();
+    }
+
+    fn get_answer(&mut self, mut current_best: usize, target: usize) -> usize {
         let choose = |size, current_best| {
             if target < size && size < current_best {
                 size
@@ -81,7 +102,7 @@ impl<'a> Directory<'a> {
 
         for subdir in &self.subdirs {
             current_best = choose(
-                subdir.borrow().get_answer(current_best, target),
+                subdir.borrow_mut().get_answer(current_best, target),
                 current_best,
             );
         }
@@ -93,14 +114,25 @@ impl<'a> Directory<'a> {
 impl<'a> Display for Directory<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn aux<'a>(dir: impl Deref<Target = Directory<'a>>, depth: usize, out: &mut Vec<String>) {
-            out.push(format!(
-                "{space:width$}- dir {} {} | {}",
-                dir.name,
-                dir.size,
-                dir.total_size(),
-                space = ' ',
-                width = depth
-            ));
+            let s = if let Some(total_size) = dir.total_size {
+                format!(
+                    "{space:width$}- dir {} {} | {}",
+                    dir.name,
+                    dir.size,
+                    total_size,
+                    space = ' ',
+                    width = depth
+                )
+            } else {
+                format!(
+                    "{space:width$}- dir {} {}",
+                    dir.name,
+                    dir.size,
+                    space = ' ',
+                    width = depth
+                )
+            };
+            out.push(s);
 
             for subdir in &dir.subdirs {
                 aux(subdir.borrow(), depth + 2, out);
@@ -113,12 +145,12 @@ impl<'a> Display for Directory<'a> {
     }
 }
 
-struct WorkingDirectory<'a> {
+struct FileSystem<'a> {
     root: DirectoryRef<'a>,
     cwd: DirectoryRef<'a>,
 }
 
-impl<'a> WorkingDirectory<'a> {
+impl<'a> FileSystem<'a> {
     fn new() -> Self {
         let root = Rc::new(RefCell::new(Directory::root()));
         Self {
@@ -138,11 +170,13 @@ impl<'a> WorkingDirectory<'a> {
     }
 
     fn update(&mut self, ls_result: &LsResult<'a>) {
-        self.cwd.borrow_mut().size = ls_result.size;
-
         for &dir_name in &ls_result.subdirs {
             self.add_child(dir_name)
         }
+
+        let mut cwd = self.cwd.borrow_mut();
+        cwd.size = ls_result.size;
+        cwd.clear_total_size();
     }
 
     fn cd_root(&mut self) {
@@ -190,17 +224,17 @@ impl<'a> WorkingDirectory<'a> {
         }
     }
 
-    fn get_answer(&self) -> usize {
+    fn get_answer(&mut self) -> usize {
         const TOTAL_DISK_SPACE: usize = 70000000;
         const REQUIRED_SPACE: usize = 30000000;
 
-        let root = self.root.borrow();
+        let mut root = self.root.borrow_mut();
         let free_space = TOTAL_DISK_SPACE - root.total_size();
         root.get_answer(REQUIRED_SPACE, REQUIRED_SPACE - free_space)
     }
 }
 
-impl Display for WorkingDirectory<'_> {
+impl Display for FileSystem<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str("file structure:\n")?;
         writeln!(f, "{}", self.root.borrow())?;
@@ -257,7 +291,7 @@ impl<'a> TryFrom<&'a str> for LsResult<'a> {
 }
 
 pub fn main() -> Result<(), String> {
-    let mut working_directory = WorkingDirectory::new();
+    let mut working_directory = FileSystem::new();
 
     let mut input = String::new();
     io::stdin()
@@ -269,6 +303,7 @@ pub fn main() -> Result<(), String> {
         working_directory.execute(command)?;
     }
 
+    working_directory.root.borrow_mut().total_size();
     println!("{}", working_directory);
     println!("{}", working_directory.get_answer());
 
