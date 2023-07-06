@@ -8,12 +8,12 @@ mod no_space_left_on_device_arena;
 mod rock_paper_scissor;
 mod rucksack_reorganization;
 mod supply_stacks;
+mod treetop_tree_house;
 mod tuning_trouble;
 mod unstable_difusion;
 
 fn main() -> Result<(), String> {
-    no_space_left_on_device_arena::main()?;
-    // no_space_left_on_device::main()?;
+    treetop_tree_house::main()?;
 
     Ok(())
 }
