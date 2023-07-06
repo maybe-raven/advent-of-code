@@ -1,20 +1,9 @@
-#![allow(dead_code)]
-
 use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone, Copy)]
 struct LinkedNode<T> {
     value: T,
     next_index: Option<usize>,
-}
-
-impl<T> LinkedNode<T> {
-    fn new(value: T) -> Self {
-        LinkedNode {
-            value,
-            next_index: None,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -191,8 +180,15 @@ impl<'a, T> IntoIterator for LinkedListEntry<'a, T> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct LinkedListIter<'a, T>(Option<LinkedNodeEntry<'a, T>>);
+
+impl<T> Copy for LinkedListIter<'_, T> {}
+impl<'a, T> Clone for LinkedListIter<'a, T> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
 
 impl<'a, T> Iterator for LinkedListIter<'a, T> {
     type Item = &'a T;
@@ -209,6 +205,12 @@ impl<'a, T> Iterator for LinkedListIter<'a, T> {
 pub struct ArenaLinkedList<T> {
     heads: Vec<Option<usize>>,
     nodes: Vec<LinkedNode<T>>,
+}
+
+impl<T> Default for ArenaLinkedList<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> ArenaLinkedList<T> {
@@ -236,7 +238,19 @@ impl<T> ArenaLinkedList<T> {
         }
     }
 
-    pub fn get_list(&mut self, index: usize) -> LinkedListEntry<T> {
+    pub fn get_list(&self, index: usize) -> LinkedListIter<T> {
+        let node_entry = self
+            .heads
+            .get(index)
+            .copied()
+            .flatten()
+            .and_then(|i| self.nodes.get(i))
+            .map(|node| LinkedNodeEntry { source: self, node });
+
+        LinkedListIter(node_entry)
+    }
+
+    pub fn get_list_mut(&mut self, index: usize) -> LinkedListEntry<T> {
         LinkedListEntry {
             source: self,
             head_index: index,
@@ -263,14 +277,14 @@ mod tests {
         entry.insert_next(20);
         entry.insert_next(30);
 
-        let mut iter = all.get_list(0).into_iter();
+        let mut iter = all.get_list_mut(0).into_iter();
         assert_eq!(Some(1), iter.next().copied());
         assert_eq!(Some(2), iter.next().copied());
         assert_eq!(Some(3), iter.next().copied());
         assert_eq!(Some(4), iter.next().copied());
         assert_eq!(None, iter.next());
 
-        let mut iter = all.get_list(1).into_iter();
+        let mut iter = all.get_list_mut(1).into_iter();
         assert_eq!(Some(10), iter.next().copied());
         assert_eq!(Some(20), iter.next().copied());
         assert_eq!(Some(30), iter.next().copied());
