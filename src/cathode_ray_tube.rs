@@ -1,6 +1,7 @@
 #![allow(dead_code)]
-use std::{cmp::Ordering, io, num::ParseIntError, str::FromStr};
+use std::{fmt::Display, io, num::ParseIntError, str::FromStr};
 
+#[derive(Debug, Clone, Copy)]
 enum Instruction {
     Noop,
     AddX(i32),
@@ -24,44 +25,66 @@ impl FromStr for Instruction {
     }
 }
 
-pub fn main() -> Result<(), String> {
-    println!("{}", solutionate(io::stdin().lines())?);
-    Ok(())
+struct Tele {
+    register: i32,
+    cycle_id: i32,
+    output: Vec<char>,
 }
 
-fn solutionate<E: ToString, I: Iterator<Item = Result<String, E>>>(iter: I) -> Result<i32, String> {
-    const CYCLE_TARGETS: [usize; 6] = [20, 60, 100, 140, 180, 220];
-
-    let mut cycle_target_iter = CYCLE_TARGETS.into_iter();
-    let mut cycle_target = cycle_target_iter.next().unwrap();
-    let mut cycle_id = 1;
-    let mut register = 1;
-    let mut answer = 0;
-
-    for input in iter {
-        let (new_register, new_cycle_id) = match input.map_err(|e| e.to_string())?.parse()? {
-            Instruction::Noop => (register, cycle_id + 1),
-            Instruction::AddX(x) => (register + x, cycle_id + 2),
-        };
-
-        if let Some(addition) = match new_cycle_id.cmp(&cycle_target) {
-            Ordering::Less => None,
-            Ordering::Equal => Some(new_register),
-            Ordering::Greater => Some(register),
-        } {
-            answer += addition * cycle_target as i32;
-            let Some(next_target) = cycle_target_iter.next() else { return Ok(answer); };
-            cycle_target = next_target;
+impl Tele {
+    fn new() -> Self {
+        Self {
+            register: 1,
+            cycle_id: 0,
+            output: Vec::with_capacity(40),
         }
-
-        register = new_register;
-        cycle_id = new_cycle_id;
     }
 
-    Err(format!(
-        "not enough instructions; current cycle: {}; register: {}; answer: {}",
-        cycle_id, register, answer
-    ))
+    fn execute(&mut self, instruction: Instruction) {
+        match instruction {
+            Instruction::Noop => self.draw(),
+            Instruction::AddX(x) => {
+                self.draw();
+                self.draw();
+                self.register += x;
+            }
+        }
+    }
+
+    fn draw(&mut self) {
+        let ch = if (self.cycle_id % 40 - self.register).abs() < 2 {
+            '#'
+        } else {
+            '.'
+        };
+        self.output.push(ch);
+        self.cycle_id += 1;
+    }
+}
+
+impl Display for Tele {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self
+            .output
+            .chunks(40)
+            .map(|row| row.iter().collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n");
+        f.write_str(s.as_str())
+    }
+}
+
+pub fn main() -> Result<(), String> {
+    let iter = io::stdin().lines();
+    let mut tele = Tele::new();
+
+    for input in iter {
+        let instruction = input.map_err(|e| e.to_string())?.parse()?;
+        tele.execute(instruction);
+    }
+    println!("{}", tele);
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -215,11 +238,21 @@ noop
 noop
 noop";
 
+    const OUTPUT: &str = "##..##..##..##..##..##..##..##..##..##..
+###...###...###...###...###...###...###.
+####....####....####....####....####....
+#####.....#####.....#####.....#####.....
+######......######......######......####
+#######.......#######.......#######.....";
+
     #[test]
     fn test_solution() {
-        assert_eq!(
-            Ok(13140),
-            solutionate(INPUT.lines().map(|s| Ok::<String, String>(s.to_owned())))
-        );
+        let mut tele = Tele::new();
+        for line in INPUT.lines() {
+            let instruction = line.parse().unwrap();
+            tele.execute(instruction);
+        }
+        let result = tele.to_string();
+        assert_eq!(OUTPUT, result, "\nexpect:\n{}\ngot:\n{}\n", OUTPUT, result);
     }
 }
