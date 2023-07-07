@@ -3,6 +3,7 @@
 use std::{
     fmt::{Display, Write},
     io,
+    ops::IndexMut,
     str::FromStr,
 };
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -12,85 +13,33 @@ struct Coordinate {
 }
 
 impl Coordinate {
-    fn translate_tail(self, position: TailPosition) -> Self {
-        let Coordinate { x, y } = self;
-        match position {
-            TailPosition::UpLeft => Self { x: x - 1, y: y - 1 },
-            TailPosition::Up => Self { x, y: y - 1 },
-            TailPosition::UpRight => Self { x: x + 1, y: y - 1 },
-            TailPosition::Left => Self { x: x - 1, y },
-            TailPosition::Overlap => self,
-            TailPosition::Right => Self { x: x + 1, y },
-            TailPosition::DownLeft => Self { x: x - 1, y: y + 1 },
-            TailPosition::Down => Self { x, y: y + 1 },
-            TailPosition::DownRight => Self { x: x + 1, y: y + 1 },
-        }
-    }
-
-    fn translate_head(self, direction: MovementDirection) -> Self {
-        let Coordinate { x, y } = self;
+    fn translate(&mut self, direction: MovementDirection) {
         match direction {
-            MovementDirection::Up => Self { x, y: y - 1 },
-            MovementDirection::Down => Self { x, y: y + 1 },
-            MovementDirection::Left => Self { x: x - 1, y },
-            MovementDirection::Right => Self { x: x + 1, y },
+            MovementDirection::Up => self.y -= 1,
+            MovementDirection::Down => self.y += 1,
+            MovementDirection::Left => self.x -= 1,
+            MovementDirection::Right => self.x += 1,
         }
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TailPosition {
-    UpLeft,
-    Up,
-    UpRight,
-    Left,
-    Overlap,
-    Right,
-    DownLeft,
-    Down,
-    DownRight,
-}
+    fn chase(&mut self, head: Coordinate) -> bool {
+        let dx = head.x - self.x;
+        let dy = head.y - self.y;
 
-impl TailPosition {
-    fn moveify(self, direction: MovementDirection) -> Self {
-        match (self, direction) {
-            (TailPosition::UpLeft, MovementDirection::Right)
-            | (TailPosition::UpLeft, MovementDirection::Up)
-            | (TailPosition::Overlap, MovementDirection::Right)
-            | (TailPosition::DownLeft, MovementDirection::Right)
-            | (TailPosition::DownLeft, MovementDirection::Down)
-            | (TailPosition::Left, MovementDirection::Right) => Self::Left,
-            (TailPosition::UpLeft, MovementDirection::Down)
-            | (TailPosition::UpLeft, MovementDirection::Left)
-            | (TailPosition::Overlap, MovementDirection::Down)
-            | (TailPosition::UpRight, MovementDirection::Down)
-            | (TailPosition::UpRight, MovementDirection::Right)
-            | (TailPosition::Up, MovementDirection::Down) => Self::Up,
-            (TailPosition::UpRight, MovementDirection::Left)
-            | (TailPosition::UpRight, MovementDirection::Up)
-            | (TailPosition::Overlap, MovementDirection::Left)
-            | (TailPosition::DownRight, MovementDirection::Down)
-            | (TailPosition::DownRight, MovementDirection::Left)
-            | (TailPosition::Right, MovementDirection::Left) => Self::Right,
-            (TailPosition::DownLeft, MovementDirection::Up)
-            | (TailPosition::DownLeft, MovementDirection::Left)
-            | (TailPosition::Overlap, MovementDirection::Up)
-            | (TailPosition::DownRight, MovementDirection::Up)
-            | (TailPosition::DownRight, MovementDirection::Right)
-            | (TailPosition::Down, MovementDirection::Up) => Self::Down,
-            (TailPosition::Left, MovementDirection::Left)
-            | (TailPosition::Right, MovementDirection::Right)
-            | (TailPosition::Down, MovementDirection::Down)
-            | (TailPosition::Up, MovementDirection::Up) => Self::Overlap,
-            (TailPosition::Right, MovementDirection::Down)
-            | (TailPosition::Up, MovementDirection::Left) => Self::UpRight,
-            (TailPosition::Left, MovementDirection::Down)
-            | (TailPosition::Up, MovementDirection::Right) => Self::UpLeft,
-            (TailPosition::Down, MovementDirection::Right)
-            | (TailPosition::Left, MovementDirection::Up) => Self::DownLeft,
-            (TailPosition::Down, MovementDirection::Left)
-            | (TailPosition::Right, MovementDirection::Up) => Self::DownRight,
+        if dx.abs() < 2 && dy.abs() < 2 {
+            return false;
         }
+
+        if dx == 0 {
+            self.y += dy.signum();
+        } else if dy == 0 {
+            self.x += dx.signum();
+        } else {
+            self.x += dx.signum();
+            self.y += dy.signum();
+        }
+
+        true
     }
 }
 
@@ -157,34 +106,38 @@ impl Display for Movement {
     }
 }
 
-struct Simropelacrum {
-    head_coordinate: Coordinate,
-    tail_position: TailPosition,
+struct Simropelacrum<const N: usize> {
+    knots: [Coordinate; N],
     position_log: Vec<Coordinate>,
 }
 
-impl Simropelacrum {
+impl<const N: usize> Simropelacrum<N> {
+    const MAXI: usize = N - 1;
+
     fn new() -> Self {
         let coord = Coordinate { x: 0, y: 0 };
         Self {
-            head_coordinate: coord,
-            tail_position: TailPosition::Overlap,
+            knots: [coord; N],
             position_log: vec![coord],
         }
     }
 
-    fn moveify(
-        &mut self,
-        Movement {
-            direction,
-            distance,
-        }: Movement,
-    ) {
-        for _ in 0..distance {
-            self.head_coordinate = self.head_coordinate.translate_head(direction);
-            self.tail_position = self.tail_position.moveify(direction);
-            self.position_log
-                .push(self.head_coordinate.translate_tail(self.tail_position));
+    fn moveify(&mut self, movement: Movement) {
+        if N == 0 {
+            return;
+        }
+
+        for _ in 0..movement.distance {
+            self.knots[0].translate(movement.direction);
+            for i in 1..self.knots.len() {
+                let previous_knot = self.knots[i - 1];
+                let current_knot = self.knots.index_mut(i);
+                if !current_knot.chase(previous_knot) {
+                    break;
+                } else if i == Self::MAXI {
+                    self.position_log.push(*current_knot);
+                }
+            }
         }
     }
 
@@ -199,18 +152,28 @@ impl Simropelacrum {
     }
 }
 
-impl Display for Simropelacrum {
+impl<const N: usize> Display for Simropelacrum<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         assert!(!self.position_log.is_empty());
 
-        let Coordinate {
-            x: head_x,
-            y: head_y,
-        } = self.head_coordinate;
-        let mut min_x = head_x;
-        let mut max_x = head_x;
-        let mut min_y = head_y;
-        let mut max_y = head_y;
+        let mut min_x = 0;
+        let mut max_x = 0;
+        let mut min_y = 0;
+        let mut max_y = 0;
+
+        for &Coordinate { x, y } in &self.knots {
+            if x < min_x {
+                min_x = x;
+            } else if max_x < x {
+                max_x = x;
+            }
+
+            if y < min_y {
+                min_y = y;
+            } else if max_y < y {
+                max_y = y;
+            }
+        }
 
         for &Coordinate { x, y } in &self.position_log {
             if x < min_x {
@@ -232,9 +195,10 @@ impl Display for Simropelacrum {
             grid[(y - min_y) as usize][(x - min_x) as usize] = '#';
         }
 
-        grid[(head_y - min_y) as usize][(head_x - min_x) as usize] = 'H';
-        let Coordinate { x, y } = self.head_coordinate.translate_tail(self.tail_position);
-        grid[(y - min_y) as usize][(x - min_x) as usize] = 'T';
+        for (i, &Coordinate { x, y }) in self.knots.iter().enumerate() {
+            grid[(y - min_y) as usize][(x - min_x) as usize] =
+                char::from_digit(i as u32, 36).unwrap_or('*');
+        }
 
         let s = grid
             .into_iter()
@@ -246,7 +210,7 @@ impl Display for Simropelacrum {
 }
 
 pub fn main() -> Result<(), String> {
-    let mut sim = Simropelacrum::new();
+    let mut sim = Simropelacrum::<10>::new();
     for input in io::stdin().lines() {
         let line = input.map_err(|e| e.to_string())?;
         let movement: Movement = line.parse()?;
@@ -274,44 +238,15 @@ mod tests {
     }
 
     #[test]
-    fn test_simropelacrum() {
-        let mut sim = Simropelacrum::new();
-        sim.moveify(Movement {
-            direction: MovementDirection::Right,
-            distance: 4,
-        });
-
-        assert_eq!(4, sim.answerify());
-        assert!(sim.position_log.contains(&Coordinate { x: 0, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 1, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 2, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 3, y: 0 }));
-
-        sim.moveify(Movement {
-            direction: MovementDirection::Up,
-            distance: 4,
-        });
-
-        assert_eq!(7, sim.answerify());
-        assert!(sim.position_log.contains(&Coordinate { x: 0, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 1, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 2, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 3, y: 0 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 4, y: -1 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 4, y: -2 }));
-        assert!(sim.position_log.contains(&Coordinate { x: 4, y: -3 }));
-    }
-
-    #[test]
     fn test_solution() {
-        const INPUT: &str = "R 4
-U 4
-L 3
-D 1
-R 4
-D 1
-L 5
-R 2";
+        const INPUT: &str = "R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20";
 
         let movements: Vec<Movement> = INPUT
             .lines()
@@ -319,7 +254,7 @@ R 2";
             .collect::<Result<_, _>>()
             .unwrap();
 
-        let mut sim = Simropelacrum::new();
+        let mut sim = Simropelacrum::<10>::new();
         for m in movements {
             sim.moveify(m);
             println!("{}", m);
@@ -327,6 +262,19 @@ R 2";
             println!("");
         }
 
-        assert_eq!(13, sim.answerify());
+        assert_eq!(36, sim.answerify());
+    }
+
+    #[test]
+    fn test_chase() {
+        let mut coord = Coordinate { x: 0, y: 0 };
+        coord.chase(Coordinate { x: 0, y: 0 });
+        assert_eq!(Coordinate { x: 0, y: 0 }, coord);
+        coord.chase(Coordinate { x: 1, y: 1 });
+        assert_eq!(Coordinate { x: 0, y: 0 }, coord);
+        coord.chase(Coordinate { x: 2, y: 0 });
+        assert_eq!(Coordinate { x: 1, y: 0 }, coord);
+        coord.chase(Coordinate { x: 3, y: 1 });
+        assert_eq!(Coordinate { x: 2, y: 1 }, coord);
     }
 }
