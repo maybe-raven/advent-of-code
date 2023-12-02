@@ -1,56 +1,95 @@
-use std::collections::HashMap;
+use std::str::FromStr;
 
-fn main() -> Result<(), String> {
-    let mut dict = HashMap::with_capacity(10);
-    dict.insert("zero", 0);
-    dict.insert("one", 1);
-    dict.insert("two", 2);
-    dict.insert("three", 3);
-    dict.insert("four", 4);
-    dict.insert("five", 5);
-    dict.insert("six", 6);
-    dict.insert("seven", 7);
-    dict.insert("eight", 8);
-    dict.insert("nine", 9);
+mod day_1;
 
-    let f = |s: &str| -> Option<usize> {
-        if let Some(d) = s.chars().next()?.to_digit(10) {
-            // If there's at least one character in the string and the first one is a digit,
-            // then return that digit as usize.
-            Some(d as usize)
+#[derive(Debug, Clone, Copy)]
+enum Color {
+    Blue,
+    Red,
+    Green,
+}
+
+impl FromStr for Color {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("blue") {
+            Ok(Self::Blue)
+        } else if s.eq_ignore_ascii_case("red") {
+            Ok(Self::Red)
+        } else if s.eq_ignore_ascii_case("green") {
+            Ok(Self::Green)
         } else {
-            // Otherwise, go through `dict` and try to match a word to the start of the string;
-            // if there is a match, then return the corresponding digit; otherwise, it's not a
-            // digit so return `None`.
-            for (&key, &value) in &dict {
-                if s.starts_with(key) {
-                    return Some(value);
+            Err(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CubeCounts {
+    red: usize,
+    green: usize,
+    blue: usize,
+}
+
+impl CubeCounts {
+    fn check(&self, max: &Self) -> bool {
+        self.red <= max.red && self.green <= max.green && self.blue <= max.blue
+    }
+}
+
+impl FromStr for CubeCounts {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let aux = || -> Option<Self> {
+            let mut cube_counts = CubeCounts::default();
+
+            for item in s.split(',') {
+                let (count_str, color_str) = item.trim().split_once(' ')?;
+                let count = count_str.parse().ok()?;
+                match color_str.parse().ok()? {
+                    Color::Blue => cube_counts.blue = count,
+                    Color::Red => cube_counts.red = count,
+                    Color::Green => cube_counts.green = count,
                 }
             }
-            None
-        }
-    };
 
+            Some(cube_counts)
+        };
+        aux().ok_or(())
+    }
+}
+
+const MAX_COUNTS: CubeCounts = CubeCounts {
+    red: 12,
+    green: 13,
+    blue: 14,
+};
+
+fn main() -> Result<(), String> {
     let answer: Result<usize, String> = std::io::stdin()
         .lines()
-        .map(|input| -> Result<usize, String> {
-            let line = input.map_err(|e| e.to_string())?;
+        .enumerate()
+        .map(|(i, s)| -> Result<usize, String> {
+            // Propagate IO Error.
+            let s = s.map_err(|e| e.to_string())?;
 
-            if !line.is_ascii() {
-                return Err("Only ASCII characters are accepted".to_string());
+            // Trim useless ID information. We just use line number instead.
+            let (_, s) = s
+                .split_once(':')
+                .ok_or_else(|| format!("Failed to parse line: {s}"))?;
+
+            for item in s.split(';') {
+                let counts: CubeCounts = item
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("Failed to parse item \"{item}\" in input: {s}"))?;
+                if !counts.check(&MAX_COUNTS) {
+                    return Ok(0);
+                }
             }
-
-            let mut iter = (0..line.len()).map(|i| &line[i..]).filter_map(f);
-            // Problem description doesn't specify what to do if the input has no digit, so assume
-            // the input is invalid.
-            let first_digit = iter
-                .next()
-                .ok_or_else(|| format!("No digit found in line: {}", line))?;
-            // Problem description does specify that if the second digit is missing, the first
-            // digit is used twice.
-            let last_digit = iter.last().unwrap_or(first_digit);
-
-            Ok(first_digit * 10 + last_digit)
+            Ok(i + 1)
         })
         .sum();
 
