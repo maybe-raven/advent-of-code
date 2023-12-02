@@ -33,8 +33,16 @@ struct CubeCounts {
 }
 
 impl CubeCounts {
-    fn check(&self, max: &Self) -> bool {
-        self.red <= max.red && self.green <= max.green && self.blue <= max.blue
+    fn acc(self, other: Self) -> Self {
+        Self {
+            red: self.red.max(other.red),
+            green: self.green.max(other.green),
+            blue: self.blue.max(other.blue),
+        }
+    }
+
+    fn power(&self) -> usize {
+        self.red * self.green * self.blue
     }
 }
 
@@ -61,17 +69,10 @@ impl FromStr for CubeCounts {
     }
 }
 
-const MAX_COUNTS: CubeCounts = CubeCounts {
-    red: 12,
-    green: 13,
-    blue: 14,
-};
-
 fn main() -> Result<(), String> {
     let answer: Result<usize, String> = std::io::stdin()
         .lines()
-        .enumerate()
-        .map(|(i, s)| -> Result<usize, String> {
+        .map(|s| -> Result<usize, String> {
             // Propagate IO Error.
             let s = s.map_err(|e| e.to_string())?;
 
@@ -80,16 +81,18 @@ fn main() -> Result<(), String> {
                 .split_once(':')
                 .ok_or_else(|| format!("Failed to parse line: {s}"))?;
 
-            for item in s.split(';') {
-                let counts: CubeCounts = item
-                    .trim()
-                    .parse()
-                    .map_err(|_| format!("Failed to parse item \"{item}\" in input: {s}"))?;
-                if !counts.check(&MAX_COUNTS) {
-                    return Ok(0);
-                }
-            }
-            Ok(i + 1)
+            let power = s
+                .split(';')
+                .map(|x| -> Result<CubeCounts, String> {
+                    x.trim()
+                        .parse()
+                        .map_err(|_| format!("Failed to parse item \"{x}\" in input: {s}"))
+                })
+                .reduce(|acc, x| Ok(acc?.acc(x?)))
+                .ok_or_else(|| "Input is empty".to_string())??
+                .power();
+
+            Ok(power)
         })
         .sum();
 
