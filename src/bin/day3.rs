@@ -49,14 +49,8 @@ impl PartSymbols {
     }
 
     fn check(&self, part: &PartNumber) -> bool {
-        let start = if part.start_index == 0 {
-            0
-        } else {
-            part.start_index - 1
-        };
-
+        let start = part.start_index.saturating_sub(1);
         let end = part.end_index + 1;
-
         self.v.iter().flatten().any(|i| (start..=end).contains(i))
     }
 }
@@ -119,16 +113,19 @@ fn main() -> Result<(), String> {
                 end_index = i;
             }
 
+            if started {
+                part_numbers_scanning.push(PartNumber {
+                    start_index,
+                    end_index,
+                    value,
+                });
+            }
+
             for part in part_numbers_current.iter() {
                 if part_symbols.check(part) {
                     *sum += part.value;
                 }
             }
-
-            dbg!(&part_symbols);
-            dbg!(&part_numbers_current);
-            dbg!(&part_numbers_scanning);
-            dbg!(&sum);
 
             part_symbols.newline();
             swap(part_numbers_current, part_numbers_scanning);
