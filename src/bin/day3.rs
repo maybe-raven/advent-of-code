@@ -1,14 +1,5 @@
+#![allow(unused)]
 use std::{io, mem::swap};
-
-trait IsPartSymbol {
-    fn is_part_symbol(&self) -> bool;
-}
-
-impl IsPartSymbol for u8 {
-    fn is_part_symbol(&self) -> bool {
-        !self.is_ascii_alphanumeric() && self != &b'.'
-    }
-}
 
 trait ToDigit {
     fn to_digit(self) -> Option<usize>;
@@ -32,13 +23,35 @@ struct PartNumber {
     value: usize,
 }
 
-#[derive(Debug, Clone, Default)]
-struct PartSymbols {
-    v: [Vec<usize>; 3],
+impl PartNumber {
+    fn new(start_index: usize, end_index: usize, value: usize) -> Self {
+        Self {
+            start_index: start_index.saturating_sub(1),
+            end_index: end_index + 1,
+            value,
+        }
+    }
+
+    fn check(&self, i: usize) -> bool {
+        (self.start_index..=self.end_index).contains(&i)
+    }
 }
 
-impl PartSymbols {
-    fn push(&mut self, value: usize) {
+#[derive(Debug, Clone)]
+struct ScanningWindow<T> {
+    v: [Vec<T>; 3],
+}
+
+impl<T> Default for ScanningWindow<T> {
+    fn default() -> Self {
+        Self {
+            v: [Vec::default(), Vec::default(), Vec::default()],
+        }
+    }
+}
+
+impl<T> ScanningWindow<T> {
+    fn push(&mut self, value: T) {
         self.v[2].push(value);
     }
 
@@ -48,17 +61,18 @@ impl PartSymbols {
         self.v[2].clear();
     }
 
-    fn check(&self, part: &PartNumber) -> bool {
-        let start = part.start_index.saturating_sub(1);
-        let end = part.end_index + 1;
-        self.v.iter().flatten().any(|i| (start..=end).contains(i))
+    fn middle(&self) -> &Vec<T> {
+        &self.v[1]
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &T> {
+        self.v.iter().flatten()
     }
 }
 
 fn main() -> Result<(), String> {
-    let mut part_numbers_current = Vec::new();
-    let mut part_numbers_scanning = Vec::new();
-    let mut part_symbols = PartSymbols::default();
+    let mut part_numbers = ScanningWindow::default();
+    let mut gear_symbol_indices = ScanningWindow::default();
     let mut sum = 0;
 
     fn preprocess(line: io::Result<String>) -> Result<String, String> {
@@ -71,9 +85,8 @@ fn main() -> Result<(), String> {
     }
 
     let mut process = {
-        let part_symbols = &mut part_symbols;
-        let part_numbers_current = &mut part_numbers_current;
-        let part_numbers_scanning = &mut part_numbers_scanning;
+        let part_numbers = &mut part_numbers;
+        let gear_symbol_indices = &mut gear_symbol_indices;
         let sum = &mut sum;
 
         move |s: &str| {
@@ -95,16 +108,12 @@ fn main() -> Result<(), String> {
                         started = true;
                     }
                 } else {
-                    if c.is_part_symbol() {
-                        part_symbols.push(i);
+                    if c == b'*' {
+                        gear_symbol_indices.push(i);
                     }
 
                     if started {
-                        part_numbers_scanning.push(PartNumber {
-                            start_index,
-                            end_index,
-                            value,
-                        });
+                        part_numbers.push(PartNumber::new(start_index, end_index, value));
                         started = false;
                         value = 0;
                     }
@@ -114,22 +123,21 @@ fn main() -> Result<(), String> {
             }
 
             if started {
-                part_numbers_scanning.push(PartNumber {
-                    start_index,
-                    end_index,
-                    value,
-                });
+                part_numbers.push(PartNumber::new(start_index, end_index, value));
             }
 
-            for part in part_numbers_current.iter() {
-                if part_symbols.check(part) {
-                    *sum += part.value;
+            // I wonder if multiple gears are allowed to share numbers. This is not specified.
+            for &i in gear_symbol_indices.middle() {
+                // Create a filter iterator that emits part numbers adjacent to a gear symbol.
+                let mut iter = part_numbers.iter().filter(|&p| p.check(i));
+                // Use pattern matching to check that the iterator yields exactly two items.
+                if let (Some(a), Some(b), None) = (iter.next(), iter.next(), iter.next()) {
+                    *sum += a.value * b.value;
                 }
             }
 
-            part_symbols.newline();
-            swap(part_numbers_current, part_numbers_scanning);
-            part_numbers_scanning.clear();
+            gear_symbol_indices.newline();
+            part_numbers.newline();
         }
     };
 
