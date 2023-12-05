@@ -222,7 +222,7 @@ fn solutionate<S: Deref<Target = str>, I: IntoIterator<Item = S>>(
         return Err(format!("No seeds found in: {first_line}"));
     }
 
-    let mappers: Vec<Mapper> = from_fn(|| Mapper::from_str_iter(&mut input_iter)).collect();
+    let mappers = from_fn(|| Mapper::from_str_iter(&mut input_iter));
     let mut staging = Vec::new();
     for mapper in mappers {
         mapper.process_ranges(&mut seed_ranges, &mut staging);
