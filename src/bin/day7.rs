@@ -8,20 +8,22 @@ struct Card(u8); //{{{
 
 impl Card {
     const MEMBERS: [(u8, u8); 13] = [
-        (b'2', 0),
-        (b'3', 1),
-        (b'4', 2),
-        (b'5', 3),
-        (b'6', 4),
-        (b'7', 5),
-        (b'8', 6),
-        (b'9', 7),
-        (b'T', 8),
-        (b'J', 9),
+        (b'J', 0),
+        (b'2', 1),
+        (b'3', 2),
+        (b'4', 3),
+        (b'5', 4),
+        (b'6', 5),
+        (b'7', 6),
+        (b'8', 7),
+        (b'9', 8),
+        (b'T', 9),
         (b'Q', 10),
         (b'K', 11),
         (b'A', 12),
     ];
+
+    const JOKER: Self = Self(0);
 
     fn with_ascii_char(input: u8) -> Option<Self> {
         Self::MEMBERS
@@ -31,40 +33,72 @@ impl Card {
 }
 //}}}
 
-// #[derive(Debug, Clone, Copy, Default)]
-// struct CardCounter([u8; 13]); //{{{
-//
-// impl CardCounter {
-//     fn new() -> Self {
-//         CardCounter([0; 13])
-//     }
-//
-//     fn add(&mut self, c: Card) {
-//         self[c] += 1;
-//     }
-//
-//     fn get(&self) -> u8 {
-//         self.0.into_iter().max().expect("`[u8; 13]` is not empty.")
-//     }
-// }
-//
-// impl Index<Card> for CardCounter {
-//     type Output = u8;
-//
-//     fn index(&self, index: Card) -> &Self::Output {
-//         self.0.index(index.0 as usize)
-//     }
-// }
-//
-// impl IndexMut<Card> for CardCounter {
-//     fn index_mut(&mut self, index: Card) -> &mut Self::Output {
-//         self.0.index_mut(index.0 as usize)
-//     }
-// }
+#[derive(Debug, Clone, Copy)]
+struct CardCounts {
+    //{{{
+    max: u8,
+    second_max: u8,
+}
+
+impl CardCounts {
+    fn new() -> Self {
+        Self {
+            max: 0,
+            second_max: 0,
+        }
+    }
+
+    fn register(&mut self, v: u8) {
+        if v > self.max {
+            self.second_max = self.max;
+            self.max = v;
+        } else if v > self.second_max {
+            self.second_max = v;
+        }
+    }
+    //}}}
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CardCounter([u8; 13]); //{{{
+
+impl CardCounter {
+    fn new() -> Self {
+        CardCounter([0; 13])
+    }
+
+    fn add(&mut self, c: Card) {
+        self[c] += 1;
+    }
+
+    fn get(&self) -> CardCounts {
+        let mut counts = CardCounts::new();
+        for count in self.0.into_iter().skip(1) {
+            counts.register(count);
+        }
+        counts.max += self[Card::JOKER];
+        counts
+    }
+}
+
+impl Index<Card> for CardCounter {
+    type Output = u8;
+
+    fn index(&self, index: Card) -> &Self::Output {
+        self.0.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<Card> for CardCounter {
+    fn index_mut(&mut self, index: Card) -> &mut Self::Output {
+        self.0.index_mut(index.0 as usize)
+    }
+}
 //}}}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HandTier {
+    //{{{
     Five,
     Four,
     House,
@@ -75,48 +109,29 @@ enum HandTier {
 }
 
 impl From<[Card; 5]> for HandTier {
-    fn from(mut cards: [Card; 5]) -> Self {
-        cards.sort_unstable();
-
-        let mut previous_card = cards[0];
-        let mut current_count = 1;
-        let mut max_count = 1;
-        let mut second_max_count = 1;
-
-        for card in cards.into_iter().skip(1) {
-            if card == previous_card {
-                current_count += 1;
-            } else {
-                if current_count > max_count {
-                    second_max_count = max_count;
-                    max_count = current_count;
-                } else if current_count > second_max_count {
-                    second_max_count = current_count
-                }
-
-                previous_card = card;
-                current_count = 1;
+    fn from(cards: [Card; 5]) -> Self {
+        let card_counts = {
+            let mut card_counter = CardCounter::new();
+            for card in cards {
+                card_counter.add(card);
             }
-        }
-        if current_count > max_count {
-            second_max_count = max_count;
-            max_count = current_count;
-        } else if current_count > second_max_count {
-            second_max_count = current_count
-        }
+            card_counter.get()
+        };
 
-        if max_count == 5 {
+        println!("{:?}; {:?}", card_counts, cards);
+
+        if card_counts.max == 5 {
             Self::Five
-        } else if max_count == 4 {
+        } else if card_counts.max == 4 {
             Self::Four
-        } else if max_count == 3 {
-            if second_max_count == 2 {
+        } else if card_counts.max == 3 {
+            if card_counts.second_max == 2 {
                 Self::House
             } else {
                 Self::Three
             }
-        } else if max_count == 2 {
-            if second_max_count == 2 {
+        } else if card_counts.max == 2 {
+            if card_counts.second_max == 2 {
                 Self::Two
             } else {
                 Self::One
@@ -150,6 +165,7 @@ impl Ord for HandTier {
     fn cmp(&self, other: &Self) -> Ordering {
         u8::from(*self).cmp(&u8::from(*other))
     }
+    //}}}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -229,6 +245,9 @@ fn solutionate<S: Deref<Target = str>, E: ToString, I: IntoIterator<Item = Resul
     hands.sort();
     let answer = hands
         .into_iter()
+        .inspect(|x| {
+            println!("{:?}", x);
+        })
         .enumerate()
         .map(|(i, hand)| (i + 1) * hand.bid)
         .sum();
