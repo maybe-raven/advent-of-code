@@ -96,16 +96,16 @@ impl IndexMut<Card> for CardCounter {
 }
 //}}}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum HandTier {
     //{{{
-    Five,
-    Four,
-    House,
-    Three,
-    Two,
-    One,
     Shit,
+    One,
+    Two,
+    Three,
+    House,
+    Four,
+    Five,
 }
 
 impl From<[Card; 5]> for HandTier {
@@ -139,31 +139,6 @@ impl From<[Card; 5]> for HandTier {
         } else {
             Self::Shit
         }
-    }
-}
-
-impl From<HandTier> for u8 {
-    fn from(value: HandTier) -> Self {
-        match value {
-            HandTier::Five => 6,
-            HandTier::Four => 5,
-            HandTier::House => 4,
-            HandTier::Three => 3,
-            HandTier::Two => 2,
-            HandTier::One => 1,
-            HandTier::Shit => 0,
-        }
-    }
-}
-
-impl PartialOrd for HandTier {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for HandTier {
-    fn cmp(&self, other: &Self) -> Ordering {
-        u8::from(*self).cmp(&u8::from(*other))
     }
     //}}}
 }
