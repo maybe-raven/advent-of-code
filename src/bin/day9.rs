@@ -10,12 +10,12 @@ fn process_line(s: &str) -> isize {
         return 0;
     };
 
-    let Some(&last) = nums.last() else {
+    let Some(&first) = nums.first() else {
         return 0;
     };
 
-    let mut last_nums = Vec::new();
-    last_nums.push(last);
+    let mut first_nums = Vec::new();
+    first_nums.push(first);
 
     while nums.len() > 1 {
         let mut is_same = true;
@@ -32,26 +32,26 @@ fn process_line(s: &str) -> isize {
         if is_same {
             break;
         }
-        last_nums.push(*nums.last().expect("`nums` should not be empty."));
+        first_nums.push(*nums.first().expect("`nums` should not be empty."));
     }
-    last_nums.push(*nums.last().expect("`nums` should not be empty."));
+    first_nums.push(*nums.first().expect("`nums` should not be empty."));
 
-    last_nums.into_iter().sum()
+    first_nums.into_iter().rev().fold(0, |acc, x| x - acc)
 }
 
-#[test]
-fn test_process_line_0() {
-    assert_eq!(18, process_line("0 3 6 9 12 15"));
-}
-
-#[test]
-fn test_process_line_1() {
-    assert_eq!(28, process_line("1 3 6 10 15 21"));
-}
+// #[test]
+// fn test_process_line_0() {
+//     assert_eq!(18, process_line("0 3 6 9 12 15"));
+// }
+//
+// #[test]
+// fn test_process_line_1() {
+//     assert_eq!(28, process_line("1 3 6 10 15 21"));
+// }
 
 #[test]
 fn test_process_line_2() {
-    assert_eq!(68, process_line("10 13 16 21 30 45"));
+    assert_eq!(5, process_line("10 13 16 21 30 45"));
 }
 
 fn main() -> Result<(), io::Error> {
