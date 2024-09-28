@@ -3,6 +3,7 @@ mod calorie_counting;
 mod camp_cleanup;
 mod cathode_ray_tube;
 mod full_of_hot_air;
+mod monkey_in_the_middle;
 mod monkey_map;
 mod no_space_left_on_device;
 mod no_space_left_on_device_arena;
